@@ -97,10 +97,8 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("🛡️ Live System Persona")
     
-    # NEW MANUAL OVERRIDE LOCK SWITCH FOR USER DESIGNATION
     override_mode = st.checkbox("🔒 Lock Custom User Instructions", value=False, help="Check this box to freeze your custom prompt text and completely stop the system from auto-updating it.")
 
-    # Determine which blueprint string to pass based on user toggle mode
     if override_mode:
         if "user_frozen_prompt" not in st.session_state:
             st.session_state.user_frozen_prompt = persona_blueprints[st.session_state.current_file_type]
@@ -115,7 +113,6 @@ with st.sidebar:
         height=180
     )
     
-    # Save the text live if you are editing under override lock mode
     if override_mode:
         st.session_state.user_frozen_prompt = user_configured_prompt
 
@@ -167,9 +164,18 @@ with tab1:
                 )
                 
                 for chunk in completion:
+                    # Bulletproof parsing of list-wrapped chunk payloads natively optimized for new Groq structures
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices.delta if isinstance(chunk.choices, list) else chunk.choices.delta
-                        chunk_text = getattr(delta, 'content', '') if hasattr(delta, 'content') else delta.get('content', '')
+                        first_choice = chunk.choices[0] if isinstance(chunk.choices, list) else chunk.choices
+                        
+                        if hasattr(first_choice, 'delta'):
+                            delta_obj = first_choice.delta
+                            chunk_text = getattr(delta_obj, 'content', '') or ''
+                        elif isinstance(first_choice, dict) and 'delta' in first_choice:
+                            chunk_text = first_choice['delta'].get('content', '') or ''
+                        else:
+                            chunk_text = ''
+                            
                         if chunk_text:
                             full_response += chunk_text
                             placeholder.markdown(full_response + "▌")
@@ -205,7 +211,6 @@ with tab2:
         elif file_type in ["mp4", "mov"]:
             detected_type = "video"
 
-    # Only reload if override mode is false, preventing user typing from getting wiped out
     if not override_mode and detected_type != st.session_state.current_file_type:
         st.session_state.current_file_type = detected_type
         st.rerun()
@@ -285,7 +290,7 @@ with tab2:
                     st.caption(f"🛡️ Applied Active Instructions: {user_configured_prompt[:60]}...")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
+                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
