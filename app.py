@@ -121,7 +121,7 @@ with st.sidebar:
     # ==========================================
     st.markdown("---")
     if st.button("🗑️ Clear Cache & Reset Chat", help="Wipes conversation history and resets the AI context state."):
-        st.session_state.messages = []
+        st.session_state.messages =
         st.session_state.current_file_type = "default"
         if "user_frozen_prompt" in st.session_state:
             del st.session_state.user_frozen_prompt
@@ -136,7 +136,7 @@ tab1, tab2 = st.tabs(["💬 Underwriting Chat Assistant", "📁 Multi-Format Ris
 # --- TAB 1: CONVERSATIONAL ASSISTANT ---
 with tab1:
     if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.session_state.messages =
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
@@ -164,9 +164,8 @@ with tab1:
                 )
                 
                 for chunk in completion:
-                    # Bulletproof parsing of list-wrapped chunk payloads natively optimized for new Groq structures
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        first_choice = chunk.choices[0] if isinstance(chunk.choices, list) else chunk.choices
+                        first_choice = chunk.choices if isinstance(chunk.choices, list) else chunk.choices
                         
                         if hasattr(first_choice, 'delta'):
                             delta_obj = first_choice.delta
@@ -276,21 +275,24 @@ with tab2:
         if analysis_prompt and st.button("🚀 Execute Multi-Format Risk Scan"):
             with st.spinner("Processing asset layers using cloud-hosted open weights..."):
                 try:
+                    # Append formatting instruction to prevent conversational overflow
+                    high_density_instruction = user_configured_prompt + " Summarize concisely using short, high-impact bullet points."
+                    
                     response = client.chat.completions.create(
                         model=model_option,
                         messages=[
-                            {"role": "system", "content": user_configured_prompt}, 
+                            {"role": "system", "content": high_density_instruction}, 
                             {"role": "user", "content": analysis_prompt}
                         ],
                         temperature=0.1,
-                        max_tokens=250
+                        max_tokens=750  # Expanded token window for complete un-truncated report formats
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
                     st.caption(f"🛡️ Applied Active Instructions: {user_configured_prompt[:60]}...")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
+                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
