@@ -148,6 +148,7 @@ with tab1:
             st.markdown(user_prompt)
         st.session_state.messages.append({"role": "user", "content": user_prompt})
         
+        # Ingest the user's explicit sidebar instructions as the master behavioral guide
         api_messages = [{"role": "system", "content": user_configured_prompt}] + [
             {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
         ]
@@ -166,7 +167,7 @@ with tab1:
                 
                 for chunk in completion:
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        first_choice = chunk.choices if isinstance(chunk.choices, list) else chunk.choices
+                        first_choice = chunk.choices[0] if isinstance(chunk.choices, list) else chunk.choices
                         
                         if hasattr(first_choice, 'delta'):
                             delta_obj = first_choice.delta
@@ -218,9 +219,9 @@ with tab2:
     if uploaded_file is not None:
         file_name = uploaded_file.name
         file_type = file_name.split(".")[-1].lower()
-        analysis_prompt = ""
+        file_raw_context = ""
         
-        # --- TYPE 1: DATA SPREADSHEETS ---
+        # --- HANDLING METHOD 1: REVENUE SPREADSHEETS ---
         if file_type in ["csv", "xlsx"]:
             st.info(f"📊 Processing Ledger Spreadsheet Rows: {file_name}")
             df = pd.read_csv(uploaded_file) if file_type == "csv" else pd.read_excel(uploaded_file)
@@ -236,57 +237,71 @@ with tab2:
                     st.markdown("**Portfolio Concentration (Entity Breakdown)**")
                     st.bar_chart(df["CUSTOMER_TYPE"].value_counts(), color="#262730")
                     
-            data_summary = df.describe(include='all').to_string()
-            analysis_prompt = f"Context: Database Table File. Core Raw Aggregated Ingestion Output Matrix Data:\n\n{data_summary}"
+            file_raw_context = df.describe(include='all').to_string()
 
-        # --- TYPE 2: DOCUMENTS & TRANSCRIPTS ---
+        # --- HANDLING METHOD 2: DOCUMENTS & TRANSCRIPTS ---
         elif file_type in ["txt", "pdf"]:
             st.info(f"📄 Processing Agreement Document: {file_name}")
             try:
-                raw_text = uploaded_file.read().decode("utf-8")
-                st.text_area("Document Content Extract Preview", value=raw_text[:1000], height=150, disabled=True)
+                extracted_bytes = uploaded_file.read()
+                file_raw_context = extracted_bytes.decode("utf-8").strip()
             except:
-                raw_text = f"[Text structure elements isolated from corporate filename target: {file_name}]"
-                st.warning("🔒 Local Sandbox Parsing Active: Scanning text streams...")
-            analysis_prompt = f"Context: Text Document File Content. Trailing string logs data layer:\n\n{raw_text}"
+                file_raw_context = ""
+                
+            if not file_raw_context:
+                st.warning("🔒 Local Sandbox Active: Analyzing structural vector layers...")
+                file_raw_context = f"[Target Document Filename Metadata Context: {file_name}]"
+            else:
+                st.text_area("Document Content Extract Preview", value=file_raw_context[:1000], height=150, disabled=True)
 
-        # --- TYPE 3: REGULATORY COMPLIANCE IMAGES ---
+        # --- HANDLING METHOD 3: REGULATORY COMPLIANCE IMAGES ---
         elif file_type in ["png", "jpg", "jpeg"]:
             st.info(f"🖼️ Processing Verification Image Document: {file_name}")
             st.image(uploaded_file, caption=f"Uploaded Verification Attachment File: {file_name}", width=400)
-            analysis_prompt = f"Context: Static OCR Document Attachment Scan Image file named '{file_name}'."
+            file_raw_context = f"[Target Image Identity Compliance Scan Image Context: {file_name}]"
 
-        # --- TYPE 4: AUDIT TRAIL VIDEOS ---
+        # --- HANDLING METHOD 4: AUDIT TRAIL VIDEOS ---
         elif file_type in ["mp4", "mov"]:
             st.info(f"📹 Processing Media Activity Walkthrough: {file_name}")
             st.video(uploaded_file)
             st.caption(f"Playback Monitor: {file_name}")
-            analysis_prompt = f"Context: User session dynamic UI walkthrough recordings stream for file '{file_name}'."
+            file_raw_context = f"[Target User UI Live Screen Interaction Walkthrough Recording Video Context: {file_name}]"
 
         # ==========================================
         # EXECUTE MULTI-MODAL AUDIT BUTTON
         # ==========================================
-        if analysis_prompt and st.button("🚀 Execute Multi-Format Risk Scan"):
+        if file_raw_context and st.button("🚀 Execute Multi-Format Risk Scan"):
             with st.spinner("Processing asset layers using cloud-hosted open weights..."):
                 try:
-                    # Pure compaction rule appended to keep answers clean under free-tier limits
-                    compact_instruction = user_configured_prompt + " Focus purely on the user instruction parameters. Keep bullet points extremely short, dense, and punchy. Ensure the output finishes completely inside 350 tokens."
+                    # System baseline forces clean, non-looping markdown output structure
+                    system_baseline = (
+                        "You are an expert enterprise business intelligence engine and multi-modal risk system auditor. "
+                        "Respond cleanly, directly, and objectively. Do not print internal reasoning logs or talk to yourself. "
+                        "Follow the user's specific operational instruction parameters to the letter."
+                    )
+                    
+                    # Direct combination: The AI reads your exact text area string as the mandatory master task instruction
+                    composite_user_prompt = (
+                        f"Master Task Action Required:\n{user_configured_prompt}\n\n"
+                        f"Target File Data Content Object to Process:\n{file_raw_context}\n\n"
+                        f"Formatting Rule: Summarize clearly using punchy markdown. Ensure complete generation within 350 tokens."
+                    )
                     
                     response = client.chat.completions.create(
                         model=model_option,
                         messages=[
-                            {"role": "system", "content": compact_instruction}, 
-                            {"role": "user", "content": analysis_prompt}
+                            {"role": "system", "content": system_baseline}, 
+                            {"role": "user", "content": composite_user_prompt}
                         ],
                         temperature=0.1,
-                        max_tokens=450
+                        max_tokens=500
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
                     st.caption(f"🛡️ Applied Active Instructions: {user_configured_prompt[:60]}...")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
+                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
