@@ -121,7 +121,8 @@ with st.sidebar:
     # ==========================================
     st.markdown("---")
     if st.button("🗑️ Clear Cache & Reset Chat", help="Wipes conversation history and resets the AI context state."):
-        st.session_state.messages =
+        # Correctly initialised empty message array vector to fix syntax error
+        st.session_state.messages = []
         st.session_state.current_file_type = "default"
         if "user_frozen_prompt" in st.session_state:
             del st.session_state.user_frozen_prompt
@@ -136,7 +137,7 @@ tab1, tab2 = st.tabs(["💬 Underwriting Chat Assistant", "📁 Multi-Format Ris
 # --- TAB 1: CONVERSATIONAL ASSISTANT ---
 with tab1:
     if "messages" not in st.session_state:
-        st.session_state.messages =
+        st.session_state.messages = []
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
@@ -275,7 +276,6 @@ with tab2:
         if analysis_prompt and st.button("🚀 Execute Multi-Format Risk Scan"):
             with st.spinner("Processing asset layers using cloud-hosted open weights..."):
                 try:
-                    # Append formatting instruction to prevent conversational overflow
                     high_density_instruction = user_configured_prompt + " Summarize concisely using short, high-impact bullet points."
                     
                     response = client.chat.completions.create(
@@ -285,7 +285,7 @@ with tab2:
                             {"role": "user", "content": analysis_prompt}
                         ],
                         temperature=0.1,
-                        max_tokens=750  # Expanded token window for complete un-truncated report formats
+                        max_tokens=750
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
