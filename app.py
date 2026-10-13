@@ -47,7 +47,6 @@ client = Groq(api_key=groq_api_key)
 # ==========================================
 # 4. TRANSIENT SESSION STATE INITIALISATION
 # ==========================================
-# Initialise a persistent state tracker to capture file type changes across context reruns
 if "current_file_type" not in st.session_state:
     st.session_state.current_file_type = "default"
 
@@ -97,10 +96,17 @@ with st.sidebar:
     
     st.markdown("---")
     st.subheader("🛡️ Live System Persona")
-    st.caption("📝 Feel free to customize or completely rewrite the prompt below. It auto-suggests templates based on the files you upload!")
+    
+    # NEW MANUAL OVERRIDE LOCK SWITCH FOR USER DESIGNATION
+    override_mode = st.checkbox("🔒 Lock Custom User Instructions", value=False, help="Check this box to freeze your custom prompt text and completely stop the system from auto-updating it.")
 
-    # Tie the text area directly to the current state value block
-    active_blueprint = persona_blueprints[st.session_state.current_file_type]
+    # Determine which blueprint string to pass based on user toggle mode
+    if override_mode:
+        if "user_frozen_prompt" not in st.session_state:
+            st.session_state.user_frozen_prompt = persona_blueprints[st.session_state.current_file_type]
+        active_blueprint = st.session_state.user_frozen_prompt
+    else:
+        active_blueprint = persona_blueprints[st.session_state.current_file_type]
     
     user_configured_prompt = st.text_area(
         "Active System Instructions",
@@ -108,6 +114,10 @@ with st.sidebar:
         key="editable_system_prompt",
         height=180
     )
+    
+    # Save the text live if you are editing under override lock mode
+    if override_mode:
+        st.session_state.user_frozen_prompt = user_configured_prompt
 
     # ==========================================
     # CLEAR CACHE & RESET BUTTON
@@ -116,6 +126,8 @@ with st.sidebar:
     if st.button("🗑️ Clear Cache & Reset Chat", help="Wipes conversation history and resets the AI context state."):
         st.session_state.messages = []
         st.session_state.current_file_type = "default"
+        if "user_frozen_prompt" in st.session_state:
+            del st.session_state.user_frozen_prompt
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
@@ -138,7 +150,6 @@ with tab1:
             st.markdown(user_prompt)
         st.session_state.messages.append({"role": "user", "content": user_prompt})
         
-        # Ingest the user's live sidebar configurations
         api_messages = [{"role": "system", "content": user_configured_prompt}] + [
             {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
         ]
@@ -157,7 +168,7 @@ with tab1:
                 
                 for chunk in completion:
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices[0].delta if isinstance(chunk.choices, list) else chunk.choices.delta
+                        delta = chunk.choices.delta if isinstance(chunk.choices, list) else chunk.choices.delta
                         chunk_text = getattr(delta, 'content', '') if hasattr(delta, 'content') else delta.get('content', '')
                         if chunk_text:
                             full_response += chunk_text
@@ -180,7 +191,6 @@ with tab2:
         type=["csv", "xlsx", "pdf", "txt", "png", "jpg", "jpeg", "mp4", "mov"]
     )
     
-    # Context checking layer to capture type state shifts
     detected_type = "default"
     if uploaded_file is not None:
         file_name = uploaded_file.name
@@ -195,12 +205,11 @@ with tab2:
         elif file_type in ["mp4", "mov"]:
             detected_type = "video"
 
-    # If the file type has shifted, update state and trigger an instant clean UI reset
-    if detected_type != st.session_state.current_file_type:
+    # Only reload if override mode is false, preventing user typing from getting wiped out
+    if not override_mode and detected_type != st.session_state.current_file_type:
         st.session_state.current_file_type = detected_type
         st.rerun()
 
-    # Continue processing file metrics post UI-sync check
     if uploaded_file is not None:
         file_name = uploaded_file.name
         file_type = file_name.split(".")[-1].lower()
@@ -265,7 +274,7 @@ with tab2:
                     response = client.chat.completions.create(
                         model=model_option,
                         messages=[
-                            {"role": "system", "content": user_configured_prompt}, # Formatted directly from user input field
+                            {"role": "system", "content": user_configured_prompt}, 
                             {"role": "user", "content": analysis_prompt}
                         ],
                         temperature=0.1,
@@ -276,7 +285,7 @@ with tab2:
                     st.caption(f"🛡️ Applied Active Instructions: {user_configured_prompt[:60]}...")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
+                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
