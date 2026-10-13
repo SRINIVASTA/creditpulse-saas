@@ -71,7 +71,9 @@ with st.sidebar:
     # ==========================================
     st.markdown("---")
     if st.button("🗑️ Clear Cache & Reset Chat", help="Wipes conversation history and resets the AI context state."):
-        st.session_state.messages =
+        # Correctly initialised empty message array vector
+        st.session_state.messages = []
+        # Clear Streamlit's internal computation cache
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
@@ -85,7 +87,7 @@ with tab1:
     chat_system_role = "You are an expert financial risk analyst. Provide highly structured, conservative risk observations."
     
     if "messages" not in st.session_state:
-        st.session_state.messages =
+        st.session_state.messages = []
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
@@ -163,7 +165,6 @@ with tab2:
                     
             data_summary = df.describe(include='all').to_string()
             
-            # Formatted entries for data parsing
             dynamic_system_prompt = "You are a quantitative data risk scientist specializing in forensic accounting and tabular anomaly detection. Output highly precise statistical summaries and structural risk analysis tables."
             analysis_prompt = f"Analyze the following financial dataset summary table and flag anomalies, concentration vulnerabilities, or balance gaps:\n\n{data_summary}"
 
@@ -186,7 +187,7 @@ with tab2:
             st.image(uploaded_file, caption=f"Uploaded Verification Attachment File: {file_name}", width=400)
             
             dynamic_system_prompt = "You are a specialist in automated KYC imaging, computer vision OCR auditing, and digital identity fraud verification under the DPDP Act 2026."
-            analysis_prompt = f"Act as an OCR compliance evaluator. The user has uploaded an identity document picture named '{file_name}'. Detail what strict structural image integrity and security checks (e.g., anti-spoofing, metadata tracking) must be run on digital scans to protect data processing boundaries."
+            analysis_prompt = f"Act as an OCR compliance evaluator. The user has uploaded an identity document picture named '{file_name}'. Detail what strict structural image integrity and security checks (e.g., anti-spoofing, metadata tracking) must be run on digital image uploads to enforce the DPDP Act 2026."
 
         # --- TYPE 4: AUDIT TRAIL VIDEOS ---
         elif file_type in ["mp4", "mov"]:
@@ -221,7 +222,6 @@ with tab2:
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
-                    st.caption(f"🛡️ Active Role: {dynamic_system_prompt.split('.')[0]}.")
                     
                     if hasattr(response, 'choices') and response.choices:
                         first_choice = response.choices if isinstance(response.choices, list) else response.choices
