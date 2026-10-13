@@ -118,7 +118,7 @@ with tab1:
                 
                 for chunk in completion:
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices.delta if isinstance(chunk.choices, list) else chunk.choices.delta
+                        delta = chunk.choices[0].delta if isinstance(chunk.choices, list) else chunk.choices.delta
                         chunk_text = getattr(delta, 'content', '') if hasattr(delta, 'content') else delta.get('content', '')
                         if chunk_text:
                             full_response += chunk_text
@@ -201,13 +201,14 @@ with tab2:
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": analysis_prompt}
                         ],
-                        temperature=0.1
+                        temperature=0.1,
+                        max_tokens=250  # Hard limits token size to prevent 429 rate limit blocks
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
+                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
