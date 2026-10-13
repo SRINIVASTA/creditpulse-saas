@@ -63,21 +63,15 @@ with st.sidebar:
     st.markdown("---")
     temperature = st.slider("Temperature Tuning", min_value=0.0, max_value=1.0, value=0.1, step=0.1)
     
-    system_prompt = st.text_area(
-        "System Instructions",
-        value=(
-            "You are an expert financial risk analyst. "
-            "Analyze business data, ledger entries, or banking texts carefully. "
-            "Provide highly structured, conservative, and bulleted risk audit observations."
-        )
-    )
+    # Base system prompt placeholder
+    st.info("💡 Note: The underlying AI System Role will dynamically auto-tune itself based on the specific file format you upload in Tab 2 to guarantee maximum underwriting accuracy.")
 
     # ==========================================
     # CLEAR CACHE & RESET BUTTON
     # ==========================================
     st.markdown("---")
     if st.button("🗑️ Clear Cache & Reset Chat", help="Wipes conversation history and resets the AI context state."):
-        st.session_state.messages = []
+        st.session_state.messages =
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
@@ -88,8 +82,10 @@ with st.sidebar:
 tab1, tab2 = st.tabs(["💬 Underwriting Chat Assistant", "📁 Multi-Format Risk Scanner"])
 # --- TAB 1: CONVERSATIONAL ASSISTANT ---
 with tab1:
+    chat_system_role = "You are an expert financial risk analyst. Provide highly structured, conservative risk observations."
+    
     if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.session_state.messages =
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
@@ -100,7 +96,7 @@ with tab1:
             st.markdown(user_prompt)
         st.session_state.messages.append({"role": "user", "content": user_prompt})
         
-        api_messages = [{"role": "system", "content": system_prompt}] + [
+        api_messages = [{"role": "system", "content": chat_system_role}] + [
             {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
         ]
         
@@ -118,7 +114,7 @@ with tab1:
                 
                 for chunk in completion:
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices[0].delta if isinstance(chunk.choices, list) else chunk.choices.delta
+                        delta = chunk.choices.delta if isinstance(chunk.choices, list) else chunk.choices.delta
                         chunk_text = getattr(delta, 'content', '') if hasattr(delta, 'content') else delta.get('content', '')
                         if chunk_text:
                             full_response += chunk_text
@@ -144,6 +140,9 @@ with tab2:
     if uploaded_file is not None:
         file_name = uploaded_file.name
         file_type = file_name.split(".")[-1].lower()
+        
+        # Initialise placeholder vars
+        dynamic_system_prompt = ""
         analysis_prompt = ""
         
         # --- TYPE 1: DATA SPREADSHEETS ---
@@ -163,7 +162,10 @@ with tab2:
                     st.bar_chart(df["CUSTOMER_TYPE"].value_counts(), color="#262730")
                     
             data_summary = df.describe(include='all').to_string()
-            analysis_prompt = f"Analyze the following financial dataset summary table and flag anomalies or compliance vulnerabilities:\n\n{data_summary}"
+            
+            # Formatted entries for data parsing
+            dynamic_system_prompt = "You are a quantitative data risk scientist specializing in forensic accounting and tabular anomaly detection. Output highly precise statistical summaries and structural risk analysis tables."
+            analysis_prompt = f"Analyze the following financial dataset summary table and flag anomalies, concentration vulnerabilities, or balance gaps:\n\n{data_summary}"
 
         # --- TYPE 2: DOCUMENTS & TRANSCRIPTS ---
         elif file_type in ["txt", "pdf"]:
@@ -174,41 +176,55 @@ with tab2:
             except:
                 raw_text = f"[PDF Vector Binary Stream Content extracted from filename: {file_name}]"
                 st.warning("🔒 Local Sandbox Parsing Active: Scanning text streams...")
-            analysis_prompt = f"Review the extracted financial document parameters for contract '{file_name}'. Identify hidden liabilities or compliance structural risks:\n\n{raw_text}"
+                
+            dynamic_system_prompt = "You are an expert corporate legal officer and contract risk auditor. You review text clauses meticulously, looking for hidden liabilities, missing regulatory disclosures, and formatting risks."
+            analysis_prompt = f"Review the extracted text parameters for contract '{file_name}'. Identify legal risk exposures or structural compliance gaps:\n\n{raw_text}"
 
         # --- TYPE 3: REGULATORY COMPLIANCE IMAGES ---
         elif file_type in ["png", "jpg", "jpeg"]:
             st.info(f"🖼️ Processing Verification Image Document: {file_name}")
             st.image(uploaded_file, caption=f"Uploaded Verification Attachment File: {file_name}", width=400)
-            analysis_prompt = f"Act as an OCR compliance model. The user has uploaded an identity document picture named '{file_name}'. Flag what operational security checks must be performed on digital image uploads to enforce the DPDP Act 2026."
+            
+            dynamic_system_prompt = "You are a specialist in automated KYC imaging, computer vision OCR auditing, and digital identity fraud verification under the DPDP Act 2026."
+            analysis_prompt = f"Act as an OCR compliance evaluator. The user has uploaded an identity document picture named '{file_name}'. Detail what strict structural image integrity and security checks (e.g., anti-spoofing, metadata tracking) must be run on digital scans to protect data processing boundaries."
 
         # --- TYPE 4: AUDIT TRAIL VIDEOS ---
         elif file_type in ["mp4", "mov"]:
             st.info(f"📹 Processing Media Activity Walkthrough: {file_name}")
             st.video(uploaded_file)
             st.caption(f"Playback Monitor: {file_name}")
-            analysis_prompt = f"The risk operations team has logged a screen video transaction file named '{file_name}'. Flag the standard operating procedures (SOP) for reviewing video logs to protect corporate audits against transaction repudiation."
+            
+            dynamic_system_prompt = "You are a senior forensic multi-modal video analyst and digital transaction audit trail investigator."
+            analysis_prompt = (
+                f"Review the metadata properties for video file '{file_name}'.\n"
+                f"Context: The user has logged a screen video transaction recording navigating a live dashboard.\n"
+                f"Tasks:\n"
+                f"1. Detail the critical verification parameters needed to confirm this session recording is genuine.\n"
+                f"2. Detail anti-tampering markers (e.g., cryptographic hashing, timestamp overlay validation).\n"
+                f"3. Provide strict, bulleted risk observations to protect operations against transaction repudiation."
+            )
 
         # ==========================================
         # EXECUTE MULTI-MODAL AUDIT BUTTON
         # ==========================================
-        if analysis_prompt and st.button("🚀 Execute Multi-Format Risk Scan"):
+        if analysis_prompt and dynamic_system_prompt and st.button("🚀 Execute Multi-Format Risk Scan"):
             with st.spinner("Processing asset layers using cloud-hosted open weights..."):
                 try:
                     response = client.chat.completions.create(
                         model=model_option,
                         messages=[
-                            {"role": "system", "content": system_prompt},
+                            {"role": "system", "content": dynamic_system_prompt},
                             {"role": "user", "content": analysis_prompt}
                         ],
                         temperature=0.1,
-                        max_tokens=250  # Hard limits token size to prevent 429 rate limit blocks
+                        max_tokens=250
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
+                    st.caption(f"🛡️ Active Role: {dynamic_system_prompt.split('.')[0]}.")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
+                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
