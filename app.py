@@ -35,15 +35,16 @@ client = Groq(api_key=groq_api_key)
 with st.sidebar:
     st.header("⚙️ Model Architecture")
     
-        model_option = st.selectbox(
+    model_option = st.selectbox(
         "Select Open-Weight Model",
         options=[
-            "llama-3.1-8b-instant", 
-            "llama-3.1-70b-versatile",
-            "mixtral-8x7b-32768"
+            "gemma2-9b-it",             # The classic Hacktoberfest event-featured ecosystem model
+            "llama-3.1-8b-instant",     # Lightweight, ultra-fast structural parsing model
+            "llama-3.3-70b-versatile",  # Powerful high-tier business reasoning model
+            "mixtral-8x7b-32768"        # Excellent high-context mixture-of-experts model
         ],
         index=0,
-        help="These are fully open-weight models permitted for commercial side-hustle applications."
+        help="These are fully open-weight models running on high-speed cloud infrastructure."
     )
     
     st.markdown("---")
