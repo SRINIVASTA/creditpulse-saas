@@ -122,10 +122,10 @@ with tab1:
                 )
                 
                 for chunk in completion:
-                    # Safe index checking for streaming dictionary / list outputs
+                    # Safe index checking for streaming outputs
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices.delta
-                        chunk_text = getattr(delta, 'content', '')
+                        delta = chunk.choices[0].delta if isinstance(chunk.choices, list) else chunk.choices.delta
+                        chunk_text = getattr(delta, 'content', '') if hasattr(delta, 'content') else delta.get('content', '')
                         if chunk_text:
                             full_response += chunk_text
                             placeholder.markdown(full_response + "▌")
@@ -170,7 +170,21 @@ with tab2:
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
-                    st.markdown(response.choices.message.content)
+                    
+                    # Safe structural response handling for list vs object return formats
+                    if hasattr(response, 'choices') and response.choices:
+                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
+                        
+                        if hasattr(first_choice, 'message'):
+                            output_text = first_choice.message.content
+                        elif isinstance(first_choice, dict) and 'message' in first_choice:
+                            output_text = first_choice['message'].get('content', '')
+                        else:
+                            output_text = getattr(first_choice, 'text', str(first_choice))
+                            
+                        st.markdown(output_text)
+                    else:
+                        st.error("Received an empty or unparseable payload from the inference endpoint.")
                     
                 except Exception as e:
                     st.error(f"Failed to process dataset: {str(e)}")
