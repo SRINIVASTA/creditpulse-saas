@@ -83,10 +83,9 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 5. MULTI-TAB WORKSPACE
+# 5. MULTI-TAB WORKSPACE INITIALISATION
 # ==========================================
 tab1, tab2 = st.tabs(["💬 Underwriting Chat Assistant", "📁 Multi-Format Risk Scanner"])
-
 # --- TAB 1: CONVERSATIONAL ASSISTANT ---
 with tab1:
     if "messages" not in st.session_state:
@@ -119,7 +118,7 @@ with tab1:
                 
                 for chunk in completion:
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices.delta
+                        delta = chunk.choices.delta if isinstance(chunk.choices, list) else chunk.choices.delta
                         chunk_text = getattr(delta, 'content', '') if hasattr(delta, 'content') else delta.get('content', '')
                         if chunk_text:
                             full_response += chunk_text
@@ -137,7 +136,6 @@ with tab2:
     st.subheader("📁 Batch Document & Transaction Risk Scanner")
     st.write("Upload financial records (CSV, Excel), text agreements (PDF, TXT), compliance images (PNG, JPG), or screen walkthrough records (MP4) to review verification profiles.")
     
-    # Expanded type limits array to accept all elements seamlessly
     uploaded_file = st.file_uploader(
         "Choose an operational file to audit...", 
         type=["csv", "xlsx", "pdf", "txt", "png", "jpg", "jpeg", "mp4", "mov"]
@@ -170,7 +168,6 @@ with tab2:
         # --- TYPE 2: DOCUMENTS & TRANSCRIPTS ---
         elif file_type in ["txt", "pdf"]:
             st.info(f"📄 Processing Agreement Document: {file_name}")
-            # Safe read fallback for binary parsing simulations
             try:
                 raw_text = uploaded_file.read().decode("utf-8")
                 st.text_area("Document Content Extract Preview", value=raw_text[:1000], height=150, disabled=True)
@@ -182,13 +179,12 @@ with tab2:
         # --- TYPE 3: REGULATORY COMPLIANCE IMAGES ---
         elif file_type in ["png", "jpg", "jpeg"]:
             st.info(f"🖼️ Processing Verification Image Document: {file_name}")
-            st.image(uploaded_file, caption=f"Uploaded Verification Attachment File: {file_name}", use_container_width=False, width=400)
+            st.image(uploaded_file, caption=f"Uploaded Verification Attachment File: {file_name}", width=400)
             analysis_prompt = f"Act as an OCR compliance model. The user has uploaded an identity document picture named '{file_name}'. Flag what operational security checks must be performed on digital image uploads to enforce the DPDP Act 2026."
 
         # --- TYPE 4: AUDIT TRAIL VIDEOS ---
         elif file_type in ["mp4", "mov"]:
             st.info(f"📹 Processing Media Activity Walkthrough: {file_name}")
-            # Render the video object elements directly into the browser layout container
             st.video(uploaded_file)
             st.caption(f"Playback Monitor: {file_name}")
             analysis_prompt = f"The risk operations team has logged a screen video transaction file named '{file_name}'. Flag the standard operating procedures (SOP) for reviewing video logs to protect corporate audits against transaction repudiation."
@@ -213,7 +209,6 @@ with tab2:
                     if hasattr(response, 'choices') and response.choices:
                         first_choice = response.choices if isinstance(response.choices, list) else response.choices
                         
-                        if hasattr(first_choice, 'message'):
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
                         elif isinstance(first_choice, dict) and 'message' in first_choice:
