@@ -38,10 +38,9 @@ with st.sidebar:
     model_option = st.selectbox(
         "Select Open-Weight Model",
         options=[
-            "gemma2-9b-it",             # The classic Hacktoberfest event-featured ecosystem model
-            "llama-3.1-8b-instant",     # Lightweight, ultra-fast structural parsing model
-            "llama-3.3-70b-versatile",  # Powerful high-tier business reasoning model
-            "mixtral-8x7b-32768"        # Excellent high-context mixture-of-experts model
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b"
+            
         ],
         index=0,
         help="These are fully open-weight models running on high-speed cloud infrastructure."
