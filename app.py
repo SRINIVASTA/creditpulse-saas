@@ -166,8 +166,7 @@ with tab1:
                 
                 for chunk in completion:
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        # Extract structural token arrays safely from list elements
-                        first_choice = chunk.choices[0] if isinstance(chunk.choices, list) else chunk.choices
+                        first_choice = chunk.choices if isinstance(chunk.choices, list) else chunk.choices
                         
                         if hasattr(first_choice, 'delta'):
                             delta_obj = first_choice.delta
@@ -238,7 +237,7 @@ with tab2:
                     st.bar_chart(df["CUSTOMER_TYPE"].value_counts(), color="#262730")
                     
             data_summary = df.describe(include='all').to_string()
-            analysis_prompt = f"Analyze the following financial dataset summary table and flag anomalies, concentration vulnerabilities, or balance gaps:\n\n{data_summary}"
+            analysis_prompt = f"Context: Database Table File. Core Raw Aggregated Ingestion Output Matrix Data:\n\n{data_summary}"
 
         # --- TYPE 2: DOCUMENTS & TRANSCRIPTS ---
         elif file_type in ["txt", "pdf"]:
@@ -247,29 +246,22 @@ with tab2:
                 raw_text = uploaded_file.read().decode("utf-8")
                 st.text_area("Document Content Extract Preview", value=raw_text[:1000], height=150, disabled=True)
             except:
-                raw_text = f"[PDF Vector Binary Stream Content extracted from filename: {file_name}]"
+                raw_text = f"[Text structure elements isolated from corporate filename target: {file_name}]"
                 st.warning("🔒 Local Sandbox Parsing Active: Scanning text streams...")
-            analysis_prompt = f"Review the extracted text parameters for contract '{file_name}'. Identify legal risk exposures or structural compliance gaps:\n\n{raw_text}"
+            analysis_prompt = f"Context: Text Document File Content. Trailing string logs data layer:\n\n{raw_text}"
 
         # --- TYPE 3: REGULATORY COMPLIANCE IMAGES ---
         elif file_type in ["png", "jpg", "jpeg"]:
             st.info(f"🖼️ Processing Verification Image Document: {file_name}")
             st.image(uploaded_file, caption=f"Uploaded Verification Attachment File: {file_name}", width=400)
-            analysis_prompt = f"Act as an OCR compliance evaluator. The user has uploaded an identity document picture named '{file_name}'. Detail what strict structural image integrity and security checks (e.g., anti-spoofing, metadata tracking) must be run on digital image uploads to enforce the DPDP Act 2026."
+            analysis_prompt = f"Context: Static OCR Document Attachment Scan Image file named '{file_name}'."
 
         # --- TYPE 4: AUDIT TRAIL VIDEOS ---
         elif file_type in ["mp4", "mov"]:
             st.info(f"📹 Processing Media Activity Walkthrough: {file_name}")
             st.video(uploaded_file)
             st.caption(f"Playback Monitor: {file_name}")
-            analysis_prompt = (
-                f"Review the metadata properties for video file '{file_name}'.\n"
-                f"Context: The user has logged a screen video transaction recording navigating a live dashboard.\n"
-                f"Tasks:\n"
-                f"1. Detail the critical verification parameters needed to confirm this session recording is genuine.\n"
-                f"2. Detail anti-tampering markers (e.g., cryptographic hashing, timestamp overlay validation).\n"
-                f"3. Provide strict, bulleted risk observations to protect operations against transaction repudiation."
-            )
+            analysis_prompt = f"Context: User session dynamic UI walkthrough recordings stream for file '{file_name}'."
 
         # ==========================================
         # EXECUTE MULTI-MODAL AUDIT BUTTON
@@ -277,8 +269,8 @@ with tab2:
         if analysis_prompt and st.button("🚀 Execute Multi-Format Risk Scan"):
             with st.spinner("Processing asset layers using cloud-hosted open weights..."):
                 try:
-                    # Enforce high-density compaction inside the hidden prompt block
-                    compact_instruction = user_configured_prompt + " Focus purely on the top core issues. Keep bullet points extremely short, dense, and punchy. Ensure the output finishes completely inside 350 tokens."
+                    # Pure compaction rule appended to keep answers clean under free-tier limits
+                    compact_instruction = user_configured_prompt + " Focus purely on the user instruction parameters. Keep bullet points extremely short, dense, and punchy. Ensure the output finishes completely inside 350 tokens."
                     
                     response = client.chat.completions.create(
                         model=model_option,
@@ -287,15 +279,14 @@ with tab2:
                             {"role": "user", "content": analysis_prompt}
                         ],
                         temperature=0.1,
-                        max_tokens=450  # Balanced ceiling value to clear free-tier OTPM limits
+                        max_tokens=450
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
                     st.caption(f"🛡️ Applied Active Instructions: {user_configured_prompt[:60]}...")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        # Safely access index-0 from choices array list to clean up UI prints
-                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
+                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
