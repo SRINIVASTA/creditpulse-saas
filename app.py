@@ -72,6 +72,19 @@ with st.sidebar:
         )
     )
 
+    # ==========================================
+    # CLEAR CACHE & RESET BUTTON
+    # ==========================================
+    st.markdown("---")
+    if st.button("🗑️ Clear Cache & Reset Chat", help="Wipes conversation history and resets the AI context state."):
+        # Clear the chat message history list
+        st.session_state.messages = []
+        # Clear Streamlit's internal computation cache
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        # Instantly refresh the UI page state
+        st.rerun()
+
 # ==========================================
 # 5. MULTI-TAB WORKSPACE (Chat + Data Auditing)
 # ==========================================
@@ -111,7 +124,7 @@ with tab1:
                 for chunk in completion:
                     # Safe index checking for streaming dictionary / list outputs
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices[0].delta
+                        delta = chunk.choices.delta
                         chunk_text = getattr(delta, 'content', '')
                         if chunk_text:
                             full_response += chunk_text
@@ -157,7 +170,7 @@ with tab2:
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
-                    st.markdown(response.choices[0].message.content)
+                    st.markdown(response.choices.message.content)
                     
                 except Exception as e:
                     st.error(f"Failed to process dataset: {str(e)}")
