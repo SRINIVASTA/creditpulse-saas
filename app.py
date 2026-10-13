@@ -115,9 +115,17 @@ with tab1:
                 )
                 
                 for chunk in completion:
+                    # Robust stream delta evaluation for active Groq open weights
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        delta = chunk.choices.delta if isinstance(chunk.choices, list) else chunk.choices.delta
-                        chunk_text = getattr(delta, 'content', '') if hasattr(delta, 'content') else delta.get('content', '')
+                        first_choice = chunk.choices[0]
+                        if hasattr(first_choice, 'delta'):
+                            delta_obj = first_choice.delta
+                            chunk_text = getattr(delta_obj, 'content', '') or ''
+                        elif isinstance(first_choice, dict) and 'delta' in first_choice:
+                            chunk_text = first_choice['delta'].get('content', '') or ''
+                        else:
+                            chunk_text = ''
+                            
                         if chunk_text:
                             full_response += chunk_text
                             placeholder.markdown(full_response + "▌")
@@ -143,7 +151,6 @@ with tab2:
         file_name = uploaded_file.name
         file_type = file_name.split(".")[-1].lower()
         
-        # Initialise placeholder vars
         dynamic_system_prompt = ""
         analysis_prompt = ""
         
@@ -224,7 +231,7 @@ with tab2:
                     st.write("### 📋 Executive Financial Audit Report")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
+                        first_choice = response.choices[0]
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
