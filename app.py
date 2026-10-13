@@ -122,7 +122,7 @@ with tab1:
                 )
                 
                 for chunk in completion:
-                    # Safe index checking for streaming outputs
+                    # Safe index checking for streaming dictionary / list outputs
                     if hasattr(chunk, 'choices') and chunk.choices:
                         delta = chunk.choices[0].delta if isinstance(chunk.choices, list) else chunk.choices.delta
                         chunk_text = getattr(delta, 'content', '') if hasattr(delta, 'content') else delta.get('content', '')
@@ -148,8 +148,32 @@ with tab2:
         # Read data spreadsheet using pandas
         df = pd.read_csv(uploaded_file)
         
-        st.write("### Data Preview (First 5 Rows)")
+        st.write("### 📋 Data Preview (First 5 Rows)")
         st.dataframe(df.head(), use_container_width=True)
+        
+        # ==========================================
+        # AUTOMATED COMPLIANCE VISUALISATIONS
+        # ==========================================
+        st.write("### 📊 Operational Risk Charts")
+        chart_col1, chart_col2 = st.columns(2)
+        
+        with chart_col1:
+            if "KYC_STATUS" in df.columns:
+                st.markdown("**Account Security Verification Spread (KYC)**")
+                kyc_counts = df["KYC_STATUS"].value_counts()
+                st.bar_chart(kyc_counts, color="#FF4B4B")
+            else:
+                st.info("💡 Upload a CSV containing a 'KYC_STATUS' column to map verification vectors.")
+                
+        with chart_col2:
+            if "CUSTOMER_TYPE" in df.columns:
+                st.markdown("**Portfolio Concentration (Entity Breakdown)**")
+                type_counts = df["CUSTOMER_TYPE"].value_counts()
+                st.bar_chart(type_counts, color="#262730")
+            else:
+                st.info("💡 Upload a CSV containing a 'CUSTOMER_TYPE' column to map entity segments.")
+                
+        st.markdown("---")
         
         # Convert data summary to text so the open-weight model can read it
         data_summary = df.describe(include='all').to_string()
