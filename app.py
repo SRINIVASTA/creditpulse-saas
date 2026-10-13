@@ -35,9 +35,10 @@ client = Groq(api_key=groq_api_key)
 with st.sidebar:
     st.header("⚙️ Model Architecture")
     
-    model_option = st.selectbox(
+        model_option = st.selectbox(
         "Select Open-Weight Model",
         options=[
+            "gemma2-9b-it",
             "llama-3.1-8b-instant", 
             "llama-3.1-70b-versatile",
             "mixtral-8x7b-32768"
