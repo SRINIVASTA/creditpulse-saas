@@ -166,7 +166,8 @@ with tab1:
                 
                 for chunk in completion:
                     if hasattr(chunk, 'choices') and chunk.choices:
-                        first_choice = chunk.choices if isinstance(chunk.choices, list) else chunk.choices
+                        # Extract structural token arrays safely from list elements
+                        first_choice = chunk.choices[0] if isinstance(chunk.choices, list) else chunk.choices
                         
                         if hasattr(first_choice, 'delta'):
                             delta_obj = first_choice.delta
@@ -276,23 +277,25 @@ with tab2:
         if analysis_prompt and st.button("🚀 Execute Multi-Format Risk Scan"):
             with st.spinner("Processing asset layers using cloud-hosted open weights..."):
                 try:
-                    high_density_instruction = user_configured_prompt + " Summarize concisely using short, high-impact bullet points."
+                    # Enforce high-density compaction inside the hidden prompt block
+                    compact_instruction = user_configured_prompt + " Focus purely on the top core issues. Keep bullet points extremely short, dense, and punchy. Ensure the output finishes completely inside 350 tokens."
                     
                     response = client.chat.completions.create(
                         model=model_option,
                         messages=[
-                            {"role": "system", "content": high_density_instruction}, 
+                            {"role": "system", "content": compact_instruction}, 
                             {"role": "user", "content": analysis_prompt}
                         ],
                         temperature=0.1,
-                        max_tokens=750
+                        max_tokens=450  # Balanced ceiling value to clear free-tier OTPM limits
                     )
                     
                     st.write("### 📋 Executive Financial Audit Report")
                     st.caption(f"🛡️ Applied Active Instructions: {user_configured_prompt[:60]}...")
                     
                     if hasattr(response, 'choices') and response.choices:
-                        first_choice = response.choices if isinstance(response.choices, list) else response.choices
+                        # Safely access index-0 from choices array list to clean up UI prints
+                        first_choice = response.choices[0] if isinstance(response.choices, list) else response.choices
                         
                         if hasattr(first_choice, 'message'):
                             output_text = first_choice.message.content
