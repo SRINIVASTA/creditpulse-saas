@@ -282,6 +282,7 @@ with tab2:
                     
                     if provider == "Google AI Studio (Gemma 4)":
                         uploaded_api_file = None
+                        output_text = ""
                         try:
                             # Direct Fix: For large text walls over 1MB, upload via the official File API layer
                             if len(file_raw_context) > 100000:
@@ -311,8 +312,6 @@ with tab2:
                             if uploaded_api_file:
                                 google_client.files.delete(name=uploaded_api_file.name)
                                 
-                        except Exception as google_err:
-                            # Error fallback cleanup protocol
                         except Exception as google_err:
                             # Error fallback cleanup protocol
                             if uploaded_api_file:
