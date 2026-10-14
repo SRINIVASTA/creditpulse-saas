@@ -3,7 +3,7 @@ import pandas as pd
 from groq import Groq
 from google import genai
 from pypdf import PdfReader
-from pdf2image import convert_from_bytes  # Converts scanned vector blocks to image frames
+from pdf2image import convert_from_bytes
 import tempfile
 import os
 
@@ -20,23 +20,7 @@ st.title("🤖 CreditPulse: Hybrid Open-Weight Risk Engine")
 st.caption("🚀 Hacktoberfest AI Challenge — Dual Cloud Inference Engine (Groq LPU / Google AI Studio)")
 
 # ==========================================
-# 2. EXTRA B2B VISUAL METRICS BAR (PRODUCTION READY)
-# ==========================================
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    if provider == "Groq Cloud (Open-Weights)":
-        st.metric(label="Inference Latency", value="~0.03s", delta="Blazing Fast LPU Engine")
-    else:
-        st.metric(label="Inference Latency", value="~0.15s", delta="Frontier Multi-Modal Cloud")
-with col2:
-    st.metric(label="Compliance Matrix", value="100% Isolated", delta="DPDP Act 2026 Ready")
-with col3:
-    st.metric(label="Context Efficiency", value="Up to 256K", delta="Gemma 4 Window Cap")
-with col4:
-    st.metric(label="Active Architecture", value=model_option.split("/")[-1], delta="Dynamic Model Switch")
-
-# ==========================================
-# 3. HYBRID SECURE API ROUTING PIPELINE
+# 2. HYBRID SECURE API ROUTING PIPELINE
 # ==========================================
 groq_key_available = "GROQ_API_KEY" in st.secrets
 google_key_available = "GOOGLE_API_KEY" in st.secrets
@@ -49,7 +33,7 @@ if groq_key_available:
 if google_key_available:
     google_client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
 # ==========================================
-# 4. TRANSIENT SESSION STATE INITIALISATION
+# 3. TRANSIENT SESSION STATE INITIALISATION
 # ==========================================
 if "current_file_type" not in st.session_state:
     st.session_state.current_file_type = "default"
@@ -63,7 +47,7 @@ persona_blueprints = {
 }
 
 # ==========================================
-# 5. SIDEBAR USER HYBRID CONTROLLER
+# 4. SIDEBAR USER HYBRID CONTROLLER
 # ==========================================
 with st.sidebar:
     st.header("⚙️ Inference Router")
@@ -131,6 +115,24 @@ with st.sidebar:
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
+
+# ==========================================
+# 5. DYNAMIC B2B VISUAL METRICS BAR
+# ==========================================
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    if provider == "Groq Cloud (Open-Weights)":
+        st.metric(label="Inference Latency", value="~0.03s", delta="Blazing Fast LPU Engine")
+    else:
+        st.metric(label="Inference Latency", value="~0.15s", delta="Frontier Multi-Modal Cloud")
+with col2:
+    st.metric(label="Compliance Matrix", value="100% Isolated", delta="DPDP Act 2026 Ready")
+with col3:
+    st.metric(label="Context Efficiency", value="Up to 256K", delta="Gemma 4 Window Cap")
+with col4:
+    st.metric(label="Active Architecture", value=model_option.split("/")[-1], delta="Dynamic Model Switch")
+
+st.markdown("---")
 # ==========================================
 # 6. MULTI-TAB WORKSPACE INITIALISATION
 # ==========================================
@@ -159,6 +161,7 @@ with tab1:
             full_response = ""
             
             try:
+                # ROUTE 1: GOOGLE GEMMA 4 RUNTIME INFERENCE MATRIX
                 if provider == "Google AI Studio (Gemma 4)":
                     chat_contents = [m["content"] for m in st.session_state.messages]
                     try:
@@ -186,6 +189,7 @@ with tab1:
                         else:
                             raise chat_err
                             
+                # ROUTE 2: GROQ TRADITIONAL TOKEN PROCESSING LOOP
                 else:
                     api_messages = [{"role": "system", "content": user_configured_prompt}] + [
                         {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
@@ -208,7 +212,6 @@ with tab1:
                 
             except Exception as e:
                 st.error(f"Execution Error: {str(e)}")
-
 # --- TAB 2: MULTI-FORMAT AUDITOR ENGINE ---
 with tab2:
     st.subheader("📁 Batch Document & Transaction Risk Scanner")
@@ -230,6 +233,7 @@ with tab2:
         st.session_state.current_file_type = detected_type
         st.rerun()
 
+    # Pre-initialise variables cleanly to eliminate syntax or NameError bugs
     file_raw_context = ""
     is_scanned_pdf = False
     
@@ -255,7 +259,6 @@ with tab2:
                 except:
                     file_raw_context = ""
                 
-                # Check for image-based scanned layouts
                 if not file_raw_context:
                     is_scanned_pdf = True
                     st.warning("⚠️ Scanned Image-PDF layout detected. Engaging multi-modal vision router framework...")
@@ -287,10 +290,10 @@ with tab2:
                         uploaded_api_files = []
                         output_text = ""
                         try:
-                            # Direct Fix: Convert image-based PDFs into pure image segments for the multimodal API
+                            # Convert flat text-less scanned layout layers into pure visual PNG files
                             if is_scanned_pdf:
                                 uploaded_file.seek(0)
-                                images = convert_from_bytes(uploaded_file.read(), first_page=1, last_page=3) # Restrict to first 3 pages to avoid timeouts
+                                images = convert_from_bytes(uploaded_file.read(), first_page=1, last_page=3)
                                 
                                 for idx, img in enumerate(images):
                                     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_img:
@@ -305,7 +308,6 @@ with tab2:
                                     f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached visual page scans completely.",
                                 ] + uploaded_api_files
                             
-                            # Standard pathway handling logic for normal vector logs
                             elif len(file_raw_context) > 100000:
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
                                     temp_file.write(uploaded_file.getvalue())
@@ -313,7 +315,8 @@ with tab2:
                                 
                                 uploaded_api_file = google_client.files.upload(file=temp_path)
                                 uploaded_api_files.append(uploaded_api_file)
-                                os.unlink(temp_path)                                
+                                os.unlink(temp_path)
+                                
                                 composite_payload = [
                                     f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached compliance object completely.",
                                     uploaded_api_file
@@ -328,16 +331,13 @@ with tab2:
                             )
                             output_text = response.text
                             
-                            # Clean up file structures safely from cloud accounts
                             for f_obj in uploaded_api_files:
                                 google_client.files.delete(name=f_obj.name)
                                 
                         except Exception as google_err:
                             for f_obj in uploaded_api_files:
-                                try: 
-                                    google_client.files.delete(name=f_obj.name)
-                                except: 
-                                    pass
+                                try: google_client.files.delete(name=f_obj.name)
+                                except: pass
                             raise google_err
                         
                         if output_text:
