@@ -160,15 +160,31 @@ with tab1:
                 # ROUTE 1: GOOGLE GEMMA 4 RUNTIME INFERENCE MATRIX
                 if provider == "Google AI Studio (Gemma 4)":
                     chat_contents = [m["content"] for m in st.session_state.messages]
-                    response_stream = google_client.models.generate_content_stream(
-                        model=model_option,
-                        contents=chat_contents,
-                        config={"system_instruction": user_configured_prompt, "temperature": temperature}
-                    )
-                    for chunk in response_stream:
-                        if chunk.text:
-                            full_response += chunk.text
-                            placeholder.markdown(full_response + "▌")
+                    try:
+                        response_stream = google_client.models.generate_content_stream(
+                            model=model_option,
+                            contents=chat_contents,
+                            config={"system_instruction": user_configured_prompt, "temperature": temperature}
+                        )
+                        for chunk in response_stream:
+                            if chunk.text:
+                                full_response += chunk.text
+                                placeholder.markdown(full_response + "▌")
+                    except Exception as chat_err:
+                        # Chat-level 500 fallback engine trigger
+                        if "500" in str(chat_err) and model_option != "gemma-4-26b-a4b-it":
+                            st.warning("🔄 System encountered a server workload spike. Routing to Gemma 4 MoE fallback cluster...")
+                            response_stream = google_client.models.generate_content_stream(
+                                model="gemma-4-26b-a4b-it",
+                                contents=chat_contents,
+                                config={"system_instruction": user_configured_prompt, "temperature": temperature}
+                            )
+                            for chunk in response_stream:
+                                if chunk.text:
+                                    full_response += chunk.text
+                                    placeholder.markdown(full_response + "▌")
+                        else:
+                            raise chat_err
                             
                 # ROUTE 2: GROQ TRADITIONAL TOKEN PROCESSING LOOP
                 else:
@@ -182,8 +198,8 @@ with tab1:
                         stream=True
                     )
                     for chunk in completion:
-                        if chunk.choices and hasattr(chunk.choices[0], 'delta'):
-                            chunk_text = getattr(chunk.choices[0].delta, 'content', '') or ''
+                        if chunk.choices and hasattr(chunk.choices, 'delta'):
+                            chunk_text = getattr(chunk.choices.delta, 'content', '') or ''
                             if chunk_text:
                                 full_response += chunk_text
                                 placeholder.markdown(full_response + "▌")
@@ -250,21 +266,33 @@ with tab2:
                     composite_user_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nOutput concise markdown summary under 350 tokens."
                     
                     if provider == "Google AI Studio (Gemma 4)":
-                        # Standardised array inputs fix output truncation
-                        response = google_client.models.generate_content(
-                            model=model_option,
-                            contents=[composite_user_prompt],
-                            config={
-                                "system_instruction": system_baseline, 
-                                "temperature": 0.1, 
-                                "max_output_tokens": 500
-                            }
-                        )
-                        
-                        if response.text:
+                        try:
+                            # Primary Action Plan
+                            response = google_client.models.generate_content(
+                                model=model_option,
+                                contents=[composite_user_prompt],
+                                config={"system_instruction": system_baseline, "temperature": 0.1, "max_output_tokens": 500}
+                            )
                             output_text = response.text
+                        except Exception as google_err:
+                            # Fallback intercept system logic for 500 errors
+                            if "500" in str(google_err) and model_option != "gemma-4-26b-a4b-it":
+                                st.warning("🔄 Target cluster busy (500 Internal). Routing calculations to Gemma 4 MoE fallback layer...")
+                                response = google_client.models.generate_content(
+                                    model="gemma-4-26b-a4b-it",
+                                    contents=[composite_user_prompt],
+                                    config={"system_instruction": system_baseline, "temperature": 0.1, "max_output_tokens": 500}
+                                )
+                                output_text = response.text
+                            else:
+                                raise google_err
+                        
+                        if output_text:
+                            st.write("### 📋 Executive Financial Audit Report")
+                            st.markdown(output_text)
                         else:
-                            output_text = "❌ Empty or unparseable output returned from the Gemma 4 server endpoint."
+                            st.error("❌ Empty payload structural response returned from Gemma cluster.")
+                            
                     else:
                         response = groq_client.chat.completions.create(
                             model=model_option,
@@ -272,10 +300,9 @@ with tab2:
                             temperature=0.1,
                             max_tokens=500
                         )
-                        output_text = response.choices[0].message.content
-                    
-                    st.write("### 📋 Executive Financial Audit Report")
-                    st.markdown(output_text)
+                        output_text = response.choices.message.content
+                        st.write("### 📋 Executive Financial Audit Report")
+                        st.markdown(output_text)
                     
                 except Exception as e:
                     st.error(f"Failed to scan document: {str(e)}")
