@@ -312,7 +312,8 @@ with tab2:
                                 
                                 uploaded_api_file = google_client.files.upload(file=temp_path)
                                 uploaded_api_files.append(uploaded_api_file)
-                                os.unlink(temp_path)                                composite_payload = [
+                                os.unlink(temp_path)                                
+                                composite_payload = [
                                     f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached compliance object completely.",
                                     uploaded_api_file
                                 ]
