@@ -200,12 +200,26 @@ with tab1:
                 
                 # ROUTE 1: GOOGLE GEMMA 4 RUNTIME INFERENCE MATRIX
                 if provider == "Google AI Studio (Gemma 4)":
-                    chat_contents = [m["content"] for m in st.session_state.messages]
+                    # HARDENED FIX: Map session history cleanly into strict Google SDK Content Types
+                    # This completely resolves the 500 Internal error caused by passing a flat string list
+                    from google.genai import types
+                    
+                    formatted_gemma_history = []
+                    for m in st.session_state.messages:
+                        # Translate chat roles to match Google's official 'user' / 'model' schema requirements
+                        api_role = "user" if m["role"] == "user" else "model"
+                        formatted_gemma_history.append(
+                            types.Content(
+                                role=api_role,
+                                parts=[types.Part.from_text(text=m["content"])]
+                            )
+                        )
+                    
                     try:
-                        # Try standard streaming path first
+                        # Try standard streaming path using the new typed history objects
                         response_stream = google_client.models.generate_content_stream(
                             model=model_option,
-                            contents=chat_contents,
+                            contents=formatted_gemma_history,
                             config={"system_instruction": user_configured_prompt, "temperature": temperature}
                         )
                         for chunk in response_stream:
@@ -214,12 +228,12 @@ with tab1:
                                 generated_chunks += 1
                                 placeholder.markdown(full_response + "▌")
                     except Exception as chat_err:
-                        # HARDENED FIX: If streaming hits a 500 error, drop streaming and run stable batch content delivery
-                        st.warning("🔄 Server congestion handled. Re-routing through stabilized B2B transaction layer...")
+                        # Secondary Fallback: If cloud congestion hits the stream node, run stable batch extraction
+                        st.warning("🔄 Streaming network busy. Re-routing through stabilized B2B batch layer...")
                         try:
                             stable_response = google_client.models.generate_content(
                                 model="gemma-4-26b-a4b-it", # Fallback to high-velocity MoE
-                                contents=chat_contents,
+                                contents=formatted_gemma_history,
                                 config={"system_instruction": user_configured_prompt, "temperature": temperature, "max_output_tokens": 500}
                             )
                             if stable_response.text:
@@ -257,16 +271,16 @@ with tab1:
                 if estimated_tokens == 0:
                     estimated_tokens = generated_chunks
                 
-                # Save data directly into session storage elements
+                # Save calculated stopwatch variables directly to metrics container
                 st.session_state.actual_latency = duration
                 st.session_state.actual_token_count = estimated_tokens
                 st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
                 
-                # Clear text box and append raw response parameters securely before layout render pass
+                # Render text and update conversation history arrays before layout reload pass
                 placeholder.markdown(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 
-                # Force window reload to lock data onto telemetry metrics grid bars
+                # Force view reload to lock data onto telemetry metrics grid bars
                 st.rerun()
                 
             except Exception as e:
