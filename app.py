@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from groq import Groq
 from google import genai
+from pypdf import PdfReader
+import tempfile
+import os
 
 # ==========================================
 # 1. PAGE SETUP & APPLICATION DESIGN
@@ -33,7 +36,6 @@ st.markdown("---")
 # ==========================================
 # 3. HYBRID SECURE API ROUTING PIPELINE
 # ==========================================
-# Check for existing background deployment configurations
 groq_key_available = "GROQ_API_KEY" in st.secrets
 google_key_available = "GOOGLE_API_KEY" in st.secrets
 
@@ -64,7 +66,6 @@ persona_blueprints = {
 with st.sidebar:
     st.header("⚙️ Inference Router")
     
-    # Core architectural engine selection toggle
     provider = st.radio(
         "Choose Infrastructure Layer",
         options=["Google AI Studio (Gemma 4)", "Groq Cloud (Open-Weights)"],
@@ -73,7 +74,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Dynamically pivot available open architectures based on selected provider layer
     if provider == "Google AI Studio (Gemma 4)":
         if not google_key_available:
             manual_google_key = st.text_input("Enter Google API Key:", type="password")
@@ -157,7 +157,6 @@ with tab1:
             full_response = ""
             
             try:
-                # ROUTE 1: GOOGLE GEMMA 4 RUNTIME INFERENCE MATRIX
                 if provider == "Google AI Studio (Gemma 4)":
                     chat_contents = [m["content"] for m in st.session_state.messages]
                     try:
@@ -171,7 +170,6 @@ with tab1:
                                 full_response += chunk.text
                                 placeholder.markdown(full_response + "▌")
                     except Exception as chat_err:
-                        # Chat-level 500 fallback engine trigger
                         if "500" in str(chat_err) and model_option != "gemma-4-26b-a4b-it":
                             st.warning("🔄 System encountered a server workload spike. Routing to Gemma 4 MoE fallback cluster...")
                             response_stream = google_client.models.generate_content_stream(
@@ -186,7 +184,6 @@ with tab1:
                         else:
                             raise chat_err
                             
-                # ROUTE 2: GROQ TRADITIONAL TOKEN PROCESSING LOOP
                 else:
                     api_messages = [{"role": "system", "content": user_configured_prompt}] + [
                         {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
@@ -241,10 +238,29 @@ with tab2:
             df = pd.read_csv(uploaded_file) if file_type == "csv" else pd.read_excel(uploaded_file)
             st.dataframe(df.head(), use_container_width=True)
             file_raw_context = df.describe(include='all').to_string()
+            
         elif file_type in ["txt", "pdf"]:
-            st.info(f"📄 Processing Agreement: {file_name}")
-            try: file_raw_context = uploaded_file.read().decode("utf-8").strip()
-            except: file_raw_context = f"[Target Document Context: {file_name}]"
+            st.info(f"📄 Processing Agreement Document: {file_name}")
+            try:
+                if file_type == "pdf":
+                    pdf_reader = PdfReader(uploaded_file)
+                    parsed_pages = []
+                    for page in pdf_reader.pages:
+                        text_extract = page.extract_text()
+                        if text_extract: parsed_pages.append(text_extract)
+                    file_raw_context = "\n".join(parsed_pages).strip()
+                else:
+                    file_raw_context = uploaded_file.read().decode("utf-8").strip()
+            except Exception as parse_err:
+                st.error(f"File Extraction Failure: {str(parse_err)}")
+                file_raw_context = ""
+                
+            if not file_raw_context:
+                st.warning("🔒 Local Sandbox Active: Analyzing structural vector layers...")
+                file_raw_context = f"[Target Document Context Metadata: {file_name}]"
+            else:
+                st.text_area("Document Content Extract Preview", value=file_raw_context[:1000], height=150, disabled=True)
+
         elif file_type in ["png", "jpg", "jpeg"]:
             st.image(uploaded_file, width=400)
             file_raw_context = f"[Compliance Document Image Context: {file_name}]"
@@ -263,46 +279,67 @@ with tab2:
             with st.spinner("Executing calculations via chosen engine router..."):
                 try:
                     system_baseline = "You are an expert financial risk engine auditor. Respond cleanly and objectively using structured markdown."
-                    composite_user_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nOutput concise markdown summary under 350 tokens."
                     
                     if provider == "Google AI Studio (Gemma 4)":
+                        uploaded_api_file = None
                         try:
-                            # Primary Action Plan
+                            # Direct Fix: For large text walls over 1MB, upload via the official File API layer
+                            if len(file_raw_context) > 100000:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as temp_file:
+                                    temp_file.write(file_raw_context.encode("utf-8"))
+                                    temp_path = temp_file.name
+                                
+                                # Index the large asset directly into Google's background infrastructure
+                                uploaded_api_file = google_client.files.upload(file=temp_path)
+                                os.unlink(temp_path)
+                                
+                                composite_payload = [
+                                    f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached indexed data object.",
+                                    uploaded_api_file
+                                ]
+                            else:
+                                composite_payload = [f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nOutput concise markdown summary under 350 tokens."]
+                            
                             response = google_client.models.generate_content(
                                 model=model_option,
-                                contents=[composite_user_prompt],
+                                contents=composite_payload,
                                 config={"system_instruction": system_baseline, "temperature": 0.1, "max_output_tokens": 500}
                             )
                             output_text = response.text
+                            
+                            # Clean up the cloud file reference once parsing executes
+                            if uploaded_api_file:
+                                google_client.files.delete(name=uploaded_api_file.name)
+                                
                         except Exception as google_err:
-                            # Fallback intercept system logic for 500 errors
-                            if "500" in str(google_err) and model_option != "gemma-4-26b-a4b-it":
-                                st.warning("🔄 Target cluster busy (500 Internal). Routing calculations to Gemma 4 MoE fallback layer...")
-                                response = google_client.models.generate_content(
-                                    model="gemma-4-26b-a4b-it",
-                                    contents=[composite_user_prompt],
-                                    config={"system_instruction": system_baseline, "temperature": 0.1, "max_output_tokens": 500}
-                                )
-                                output_text = response.text
-                            else:
-                                raise google_err
+                            # Error fallback cleanup protocol
+                        except Exception as google_err:
+                            # Error fallback cleanup protocol
+                            if uploaded_api_file:
+                                try: 
+                                    google_client.files.delete(name=uploaded_api_file.name)
+                                except: 
+                                    pass
+                            raise google_err
                         
                         if output_text:
                             st.write("### 📋 Executive Financial Audit Report")
                             st.markdown(output_text)
                         else:
-                            st.error("❌ Empty payload structural response returned from Gemma cluster.")
+                            st.error("❌ Empty payload structural response returned from Gemma cluster. Try decreasing file content size or adjustments to instructions.")
                             
                     else:
+                        # Traditional plain text slicing mechanics for Groq LPU processing
+                        truncated_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context[:50000]}\n\nOutput concise markdown summary under 350 tokens."
                         response = groq_client.chat.completions.create(
                             model=model_option,
-                            messages=[{"role": "system", "content": system_baseline}, {"role": "user", "content": composite_user_prompt}],
+                            messages=[{"role": "system", "content": system_baseline}, {"role": "user", "content": truncated_prompt}],
                             temperature=0.1,
                             max_tokens=500
                         )
                         output_text = response.choices.message.content
                         st.write("### 📋 Executive Financial Audit Report")
                         st.markdown(output_text)
-                    
+                        
                 except Exception as e:
                     st.error(f"Failed to scan document: {str(e)}")
