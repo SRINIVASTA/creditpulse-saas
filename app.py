@@ -5,6 +5,7 @@ from google import genai
 from pypdf import PdfReader
 from pdf2image import convert_from_bytes
 import tempfile
+import time  # Native Python performance execution stopwatch matrix
 import os
 
 # ==========================================
@@ -37,6 +38,12 @@ if google_key_available:
 # ==========================================
 if "current_file_type" not in st.session_state:
     st.session_state.current_file_type = "default"
+
+# Initialize tracking states for true dynamic telemetry tracking values
+if "last_latency" not in st.session_state:
+    st.session_state.last_latency = 0.0
+if "last_tokens_per_sec" not in st.session_state:
+    st.session_state.last_tokens_per_sec = 0.0
 
 persona_blueprints = {
     "default": "You are an expert financial risk analyst. Provide highly structured, conservative, and bulleted risk audit observations.",
@@ -110,6 +117,8 @@ with st.sidebar:
     if st.button("🗑️ Clear Cache & Reset Chat"):
         st.session_state.messages = []
         st.session_state.current_file_type = "default"
+        st.session_state.last_latency = 0.0
+        st.session_state.last_tokens_per_sec = 0.0
         if "user_frozen_prompt" in st.session_state:
             del st.session_state.user_frozen_prompt
         st.cache_data.clear()
@@ -117,20 +126,21 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# 5. DYNAMIC B2B VISUAL METRICS BAR
+# 5. DYNAMIC B2B VISUAL METRICS TELEMETRY BAR
 # ==========================================
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    if provider == "Groq Cloud (Open-Weights)":
-        st.metric(label="Inference Latency", value="~0.03s", delta="Blazing Fast LPU Engine")
+    # Now displays your actual computed stopwatch speeds dynamically
+    if st.session_state.last_latency > 0.0:
+        st.metric(label="Live Inference Latency", value=f"{st.session_state.last_latency:.3f}s", delta="Measured Real-Time")
     else:
-        st.metric(label="Inference Latency", value="~0.15s", delta="Frontier Multi-Modal Cloud")
+        st.metric(label="Live Inference Latency", value="Waiting...", delta="Awaiting First Run")
 with col2:
     st.metric(label="Compliance Matrix", value="100% Isolated", delta="DPDP Act 2026 Ready")
 with col3:
-    st.metric(label="Context Efficiency", value="Up to 256K", delta="Gemma 4 Window Cap")
+    st.metric(label="Context Window Cap", value="Up to 256K", delta="Gemma 4 Extended Token capacity")
 with col4:
-    st.metric(label="Active Architecture", value=model_option.split("/")[-1], delta="Dynamic Model Switch")
+    st.metric(label="Active Weights", value=model_option.split("/")[-1], delta=f"Engine: {provider.split()[0]}")
 
 st.markdown("---")
 # ==========================================
@@ -161,7 +171,9 @@ with tab1:
             full_response = ""
             
             try:
-                # ROUTE 1: GOOGLE GEMMA 4 RUNTIME INFERENCE MATRIX
+                # Stopwatch start marker configuration
+                start_timer = time.time()
+                
                 if provider == "Google AI Studio (Gemma 4)":
                     chat_contents = [m["content"] for m in st.session_state.messages]
                     try:
@@ -176,7 +188,7 @@ with tab1:
                                 placeholder.markdown(full_response + "▌")
                     except Exception as chat_err:
                         if "500" in str(chat_err) and model_option != "gemma-4-26b-a4b-it":
-                            st.warning("🔄 System encountered a server workload spike. Routing to Gemma 4 MoE fallback cluster...")
+                            st.warning("🔄 System workload spike. Routing to Gemma 4 MoE fallback cluster...")
                             response_stream = google_client.models.generate_content_stream(
                                 model="gemma-4-26b-a4b-it",
                                 contents=chat_contents,
@@ -189,7 +201,6 @@ with tab1:
                         else:
                             raise chat_err
                             
-                # ROUTE 2: GROQ TRADITIONAL TOKEN PROCESSING LOOP
                 else:
                     api_messages = [{"role": "system", "content": user_configured_prompt}] + [
                         {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
@@ -207,8 +218,13 @@ with tab1:
                                 full_response += chunk_text
                                 placeholder.markdown(full_response + "▌")
                                 
+                # Stopwatch finish marker execution calculation
+                stop_timer = time.time()
+                st.session_state.last_latency = stop_timer - start_timer
                 placeholder.markdown(full_response)
-                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
+                # Force refresh dashboard panel ribbon stats
+                st.rerun()
                 
             except Exception as e:
                 st.error(f"Execution Error: {str(e)}")
@@ -233,7 +249,6 @@ with tab2:
         st.session_state.current_file_type = detected_type
         st.rerun()
 
-    # Pre-initialise variables cleanly to eliminate syntax or NameError bugs
     file_raw_context = ""
     is_scanned_pdf = False
     
@@ -286,11 +301,13 @@ with tab2:
                 try:
                     system_baseline = "You are an expert financial risk engine auditor. Respond cleanly and objectively using structured markdown."
                     
+                    # Start calculation stopwatch
+                    start_timer = time.time()
+                    
                     if provider == "Google AI Studio (Gemma 4)":
                         uploaded_api_files = []
                         output_text = ""
                         try:
-                            # Convert flat text-less scanned layout layers into pure visual PNG files
                             if is_scanned_pdf:
                                 uploaded_file.seek(0)
                                 images = convert_from_bytes(uploaded_file.read(), first_page=1, last_page=3)
@@ -340,9 +357,14 @@ with tab2:
                                 except: pass
                             raise google_err
                         
+                        # Stop calculation timer & save state
+                        stop_timer = time.time()
+                        st.session_state.last_latency = stop_timer - start_timer
+                        
                         if output_text:
                             st.write("### 📋 Executive Financial Audit Report")
                             st.markdown(output_text)
+                            st.rerun() # Refresh layout to display dynamic timing values
                         else:
                             st.error("❌ Empty payload structural response returned from Gemma cluster.")
                             
@@ -363,9 +385,15 @@ with tab2:
                             temperature=0.1,
                             max_tokens=500
                         )
-                        output_text = response.choices[0].message.content
+                        output_text = response.choices.message.content
+                        
+                        # Stop calculation timer & save state
+                        stop_timer = time.time()
+                        st.session_state.last_latency = stop_timer - start_timer
+                        
                         st.write("### 📋 Executive Financial Audit Report")
                         st.markdown(output_text)
+                        st.rerun() # Refresh layout to display dynamic timing values
                         
                 except Exception as e:
                     st.error(f"Failed to scan document: {str(e)}")
