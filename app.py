@@ -243,9 +243,9 @@ with tab2:
         elif file_type in ["mp4", "mov"]:
             st.video(uploaded_file)
 
-        # ==========================================
-        # HYBRID ENGINE COMPOSITE SCAN PLAN
-        # ==========================================
+# ==========================================
+# HYBRID ENGINE COMPOSITE SCAN PLAN
+# ==========================================
         if st.button("🚀 Execute Hybrid Platform Risk Scan"):
             if (provider == "Google AI Studio (Gemma 4)" and not google_client) or (provider == "Groq Cloud (Open-Weights)" and not groq_client):
                 st.error("❌ Key infrastructure parameters missing.")
