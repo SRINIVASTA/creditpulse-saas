@@ -142,16 +142,16 @@ with st.sidebar:
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
+
 # ==========================================
 # 5. DYNAMIC B2B VISUAL METRICS TELEMETRY BAR
 # ==========================================
-# Isolated within a standard container layout block to render state parameters on the fly
 metrics_container = st.container()
 with metrics_container:
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         if st.session_state.actual_latency > 0.0:
-            st.metric(label="Live Inference Latency", value=f"{st.session_state.actual_latency:.3f}s", delta="Actual Stopwatch Timing")
+            st.metric(label="Live Inference Latency", value=f"{st.session_state.actual_latency:.3f}s", delta="Stopwatch Calculation")
         else:
             st.metric(label="Live Inference Latency", value="Waiting...", delta="Awaiting First Run")
     with col2:
@@ -162,7 +162,7 @@ with metrics_container:
     with col3:
         st.metric(label="Compliance Matrix", value="100% Isolated", delta="DPDP Act 2026 Ready")
     with col4:
-        st.metric(label="Active Target Weights", value=model_option.split("/")[-1], delta=f"Engine: {provider.split()[0]}")
+        st.metric(label="Active Target Architecture", value=model_option.split("/")[-1], delta=f"Engine infrastructure: {provider.split()}")
 
 st.markdown("---")
 # ==========================================
@@ -347,6 +347,10 @@ with tab2:
         # HYBRID ENGINE COMPOSITE SCAN PLAN
         # ==========================================
         st.write("### 📊 Live Performance Benchmark Evaluation Suite")
+        
+        # Create an independent, persistent empty layout block for the report display
+        report_display_anchor = st.empty()
+        
         if file_raw_context and st.button("🚀 Execute Hybrid Platform Risk Scan"):
             if (provider == "Google AI Studio (Gemma 4)" and not google_client) or (provider == "Groq Cloud (Open-Weights)" and not groq_client):
                 st.error("❌ Key infrastructure parameters missing.")
@@ -437,8 +441,9 @@ with tab2:
                 except Exception as e:
                     st.error(f"Failed to scan document: {str(e)}")
 
-    # RENDER ENGINE: Ensures the saved report persists securely on screen post-refresh
-    if st.session_state.last_audit_report:
-        st.write("---")
-        st.write("### 📋 Executive Financial Audit Report")
-        st.markdown(st.session_state.last_audit_report)
+        # FIXED PERSISTENT RENDERING LAYER: Draws text directly onto the secure anchor layout framework
+        if st.session_state.last_audit_report:
+            with report_display_anchor.container():
+                st.write("---")
+                st.write("### 📋 Executive Financial Audit Report")
+                st.markdown(st.session_state.last_audit_report)
