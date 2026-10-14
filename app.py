@@ -5,8 +5,19 @@ from google import genai
 from pypdf import PdfReader
 from pdf2image import convert_from_bytes
 import tempfile
-import time  # Native Python performance execution stopwatch matrix
+import time
 import os
+
+# Try importing extended document enclosure parsers safely with standard fallback overrides
+try:
+    from docx import Document as DocxReader
+except ImportError:
+    DocxReader = None
+
+try:
+    from pptx import Presentation as PptxReader
+except ImportError:
+    PptxReader = None
 
 # ==========================================
 # 1. PAGE SETUP & APPLICATION DESIGN
@@ -39,18 +50,21 @@ if google_key_available:
 if "current_file_type" not in st.session_state:
     st.session_state.current_file_type = "default"
 
-# Initialize tracking states for true dynamic telemetry tracking values
-if "last_latency" not in st.session_state:
-    st.session_state.last_latency = 0.0
-if "last_tokens_per_sec" not in st.session_state:
-    st.session_state.last_tokens_per_sec = 0.0
+# Primary session storage buckets for ACTUAL real-time execution benchmarks
+if "actual_latency" not in st.session_state:
+    st.session_state.actual_latency = 0.0
+if "actual_tokens_per_sec" not in st.session_state:
+    st.session_state.actual_tokens_per_sec = 0.0
+if "actual_token_count" not in st.session_state:
+    st.session_state.actual_token_count = 0
 
 persona_blueprints = {
     "default": "You are an expert financial risk analyst. Provide highly structured, conservative, and bulleted risk audit observations.",
     "spreadsheet": "You are a quantitative data risk scientist specializing in forensic accounting and tabular anomaly detection. Output highly precise statistical summaries and structural risk analysis tables.",
     "document": "You are an expert corporate legal officer and contract risk auditor. You review text clauses meticulously, looking for hidden liabilities, missing regulatory disclosures, and formatting risks.",
     "image": "You are a specialist in automated KYC imaging, computer vision OCR auditing, and digital identity fraud verification under the strict parameters of the DPDP Act 2026.",
-    "video": "You are a senior forensic multi-modal video analyst and digital transaction audit trail investigator specializing in preventing account transaction repudiation."
+    "video": "You are a senior forensic multi-modal video analyst and digital transaction audit trail investigator specializing in preventing account transaction repudiation.",
+    "audio": "You are a forensic audio investigator and speech analytics risk compliance officer checking spoken verification statements."
 }
 
 # ==========================================
@@ -117,8 +131,9 @@ with st.sidebar:
     if st.button("🗑️ Clear Cache & Reset Chat"):
         st.session_state.messages = []
         st.session_state.current_file_type = "default"
-        st.session_state.last_latency = 0.0
-        st.session_state.last_tokens_per_sec = 0.0
+        st.session_state.actual_latency = 0.0
+        st.session_state.actual_tokens_per_sec = 0.0
+        st.session_state.actual_token_count = 0
         if "user_frozen_prompt" in st.session_state:
             del st.session_state.user_frozen_prompt
         st.cache_data.clear()
@@ -128,19 +143,23 @@ with st.sidebar:
 # ==========================================
 # 5. DYNAMIC B2B VISUAL METRICS TELEMETRY BAR
 # ==========================================
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    # Now displays your actual computed stopwatch speeds dynamically
-    if st.session_state.last_latency > 0.0:
-        st.metric(label="Live Inference Latency", value=f"{st.session_state.last_latency:.3f}s", delta="Measured Real-Time")
-    else:
-        st.metric(label="Live Inference Latency", value="Waiting...", delta="Awaiting First Run")
-with col2:
-    st.metric(label="Compliance Matrix", value="100% Isolated", delta="DPDP Act 2026 Ready")
-with col3:
-    st.metric(label="Context Window Cap", value="Up to 256K", delta="Gemma 4 Extended Token capacity")
-with col4:
-    st.metric(label="Active Weights", value=model_option.split("/")[-1], delta=f"Engine: {provider.split()[0]}")
+metrics_container = st.container()
+with metrics_container:
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        if st.session_state.actual_latency > 0.0:
+            st.metric(label="Live Inference Latency", value=f"{st.session_state.actual_latency:.3f}s", delta="Stopwatch Calculation")
+        else:
+            st.metric(label="Live Inference Latency", value="Waiting...", delta="Awaiting First Run")
+    with col2:
+        if st.session_state.actual_tokens_per_sec > 0.0:
+            st.metric(label="Generation Throughput", value=f"{st.session_state.actual_tokens_per_sec:.1f} TPS", delta=f"{st.session_state.actual_token_count} Generated Tokens")
+        else:
+            st.metric(label="Generation Throughput", value="Waiting...", delta="0 Tokens Compiled")
+    with col3:
+        st.metric(label="Compliance Matrix", value="100% Isolated", delta="DPDP Act 2026 Ready")
+    with col4:
+        st.metric(label="Active Target Architecture", value=model_option.split("/")[-1], delta=f"Engine infrastructure: {provider.split()[0]}")
 
 st.markdown("---")
 # ==========================================
@@ -169,11 +188,13 @@ with tab1:
         with st.chat_message("assistant"):
             placeholder = st.empty()
             full_response = ""
+            generated_chunks = 0
             
             try:
-                # Stopwatch start marker configuration
+                # Trigger Actual Real-Time Benchmark Stopwatch
                 start_timer = time.time()
                 
+                # ROUTE 1: GOOGLE GEMMA 4 RUNTIME INFERENCE MATRIX
                 if provider == "Google AI Studio (Gemma 4)":
                     chat_contents = [m["content"] for m in st.session_state.messages]
                     try:
@@ -185,6 +206,7 @@ with tab1:
                         for chunk in response_stream:
                             if chunk.text:
                                 full_response += chunk.text
+                                generated_chunks += 1
                                 placeholder.markdown(full_response + "▌")
                     except Exception as chat_err:
                         if "500" in str(chat_err) and model_option != "gemma-4-26b-a4b-it":
@@ -197,10 +219,12 @@ with tab1:
                             for chunk in response_stream:
                                 if chunk.text:
                                     full_response += chunk.text
+                                    generated_chunks += 1
                                     placeholder.markdown(full_response + "▌")
                         else:
                             raise chat_err
                             
+                # ROUTE 2: GROQ TRADITIONAL TOKEN PROCESSING LOOP
                 else:
                     api_messages = [{"role": "system", "content": user_configured_prompt}] + [
                         {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
@@ -216,24 +240,38 @@ with tab1:
                             chunk_text = getattr(chunk.choices.delta, 'content', '') or ''
                             if chunk_text:
                                 full_response += chunk_text
+                                generated_chunks += 1
                                 placeholder.markdown(full_response + "▌")
                                 
-                # Stopwatch finish marker execution calculation
+                # Compute Actual Benchmarking Suite Metrics
                 stop_timer = time.time()
-                st.session_state.last_latency = stop_timer - start_timer
-                placeholder.markdown(full_response)
+                duration = stop_timer - start_timer
                 
-                # Force refresh dashboard panel ribbon stats
+                # Approximate generated tokens based on text word-to-token ratio metrics (1 word ~ 1.3 tokens)
+                estimated_tokens = int(len(full_response.split()) * 1.33) if full_response else 0
+                if estimated_tokens == 0:
+                    estimated_tokens = generated_chunks
+                
+                st.session_state.actual_latency = duration
+                st.session_state.actual_token_count = estimated_tokens
+                st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
+                
+                placeholder.markdown(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
+                # Force an immediate independent page refresh to show updated benchmark metrics on screen
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"Execution Error: {str(e)}")
 # --- TAB 2: MULTI-FORMAT AUDITOR ENGINE ---
 with tab2:
-    st.subheader("📁 Batch Document & Transaction Risk Scanner")
+    st.subheader("📁 Comprehensive Enclosure & Document Risk Scanner")
+    st.write("Upload any operational corporate file asset class to perform an automated AI compliance and liability scan.")
+    
     uploaded_file = st.file_uploader(
-        "Choose an operational file to audit...", 
-        type=["csv", "xlsx", "pdf", "txt", "png", "jpg", "jpeg", "mp4", "mov"]
+        "Choose an enclosure file to audit...", 
+        type=["csv", "xlsx", "pdf", "txt", "docx", "pptx", "png", "jpg", "jpeg", "mp3", "wav", "mp4", "mov"]
     )
     
     detected_type = "default"
@@ -241,9 +279,10 @@ with tab2:
         file_name = uploaded_file.name
         file_type = file_name.split(".")[-1].lower()
         if file_type in ["csv", "xlsx"]: detected_type = "spreadsheet"
-        elif file_type in ["txt", "pdf"]: detected_type = "document"
+        elif file_type in ["txt", "pdf", "docx", "pptx"]: detected_type = "document"
         elif file_type in ["png", "jpg", "jpeg"]: detected_type = "image"
         elif file_type in ["mp4", "mov"]: detected_type = "video"
+        elif file_type in ["mp3", "wav"]: detected_type = "audio"
 
     if not override_mode and detected_type != st.session_state.current_file_type:
         st.session_state.current_file_type = detected_type
@@ -256,13 +295,17 @@ with tab2:
         file_name = uploaded_file.name
         file_type = file_name.split(".")[-1].lower()
         
+        # --- ENCLOSURE TYPE 1: SPREADSHEETS (CSV, XLSX) ---
         if file_type in ["csv", "xlsx"]:
-            st.info(f"📊 Spreadsheet Registered: {file_name}")
+            st.info(f"📊 Spreadsheet Log Ingested: {file_name}")
             df = pd.read_csv(uploaded_file) if file_type == "csv" else pd.read_excel(uploaded_file)
             st.dataframe(df.head(), use_container_width=True)
             file_raw_context = df.to_string()
-        elif file_type in ["txt", "pdf"]:
-            st.info(f"📄 Agreement Document Registered: {file_name}")
+            
+        # --- ENCLOSURE TYPE 2: DOCUMENTS (PDF, TXT, WORD, PPTX) ---
+        elif file_type in ["txt", "pdf", "docx", "pptx"]:
+            st.info(f"📄 Corporate Agreement/Asset Ingested: {file_name}")
+            
             if file_type == "pdf":
                 try:
                     pdf_reader = PdfReader(uploaded_file)
@@ -273,25 +316,59 @@ with tab2:
                     file_raw_context = "\n".join(parsed_pages).strip()
                 except:
                     file_raw_context = ""
-                
                 if not file_raw_context:
                     is_scanned_pdf = True
-                    st.warning("⚠️ Scanned Image-PDF layout detected. Engaging multi-modal vision router framework...")
-                    file_raw_context = "[Scanned Multimodal Image Buffer Active]"
+                    st.warning("⚠️ Flat Scanned Image-PDF layout detected. Engaging visual multi-modal extraction layer...")
+                    file_raw_context = "[Scanned Multimodal Image Buffer Layer]"
+            
+            elif file_type == "docx":
+                if DocxReader:
+                    try:
+                        doc = DocxReader(uploaded_file)
+                        file_raw_context = "\n".join([p.text for p in doc.paragraphs]).strip()
+                    except Exception as e:
+                        file_raw_context = f"[Word Enclosure Vector Extract Error: {str(e)}]"
                 else:
-                    st.text_area("Document Text Extract Preview", value=file_raw_context[:1000], height=150, disabled=True)
+                    file_raw_context = f"[Word Document Contract Content Context: {file_name}]"
+                    st.warning("⚙️ python-docx missing in framework. Activating structured text context fallback.")
+                    
+            elif file_type == "pptx":
+                if PptxReader:
+                    try:
+                        prs = PptxReader(uploaded_file)
+                        slide_txt = []
+                        for slide in prs.slides:
+                            for shape in slide.shapes:
+                                if hasattr(shape, "text"): slide_txt.append(shape.text)
+                        file_raw_context = "\n".join(slide_txt).strip()
+                    except Exception as e:
+                        file_raw_context = f"[Presentation Enclosure Vector Extract Error: {str(e)}]"
+                else:
+                    file_raw_context = f"[Corporate PPT Presentation Deck Context: {file_name}]"
+                    st.warning("⚙️ python-pptx missing in framework. Activating presentation context fallback.")
             else:
                 file_raw_context = uploaded_file.getvalue().decode("utf-8")
+                
+            if file_raw_context and not is_scanned_pdf:
+                st.text_area("Document Content Extract Preview", value=file_raw_context[:1000], height=120, disabled=True)
+
+        # --- ENCLOSURE TYPE 3: IMAGES (PNG, JPG, JPEG) ---
         elif file_type in ["png", "jpg", "jpeg"]:
-            st.image(uploaded_file, width=400)
-            file_raw_context = "[Image Binary Buffer Active]"
+            st.image(uploaded_file, width=300)
+            file_raw_context = "[Image Identity Compliance Scan Binary Frame Active]"
+
+        # --- ENCLOSURE TYPE 4: MEDIA STREAMS (AUDIO & VIDEO ENCLOSURES) ---
+        elif file_type in ["mp3", "wav"]:
+            st.audio(uploaded_file)
+            file_raw_context = f"[Verification Voice Authentication Audio Interaction Script Log Object: {file_name}]"
         elif file_type in ["mp4", "mov"]:
             st.video(uploaded_file)
-            file_raw_context = "[Video Binary Buffer Active]"
+            file_raw_context = f"[User Interactive Screen Audit Activity Trail Walkthrough Video Tracking Object: {file_name}]"
 
         # ==========================================
         # HYBRID ENGINE COMPOSITE SCAN PLAN
         # ==========================================
+        st.write("### 📊 Live Performance Benchmark Evaluation Suite")
         if file_raw_context and st.button("🚀 Execute Hybrid Platform Risk Scan"):
             if (provider == "Google AI Studio (Gemma 4)" and not google_client) or (provider == "Groq Cloud (Open-Weights)" and not groq_client):
                 st.error("❌ Key infrastructure parameters missing.")
@@ -301,13 +378,14 @@ with tab2:
                 try:
                     system_baseline = "You are an expert financial risk engine auditor. Respond cleanly and objectively using structured markdown."
                     
-                    # Start calculation stopwatch
+                    # Start Actual Telemetry Stopwatch
                     start_timer = time.time()
                     
                     if provider == "Google AI Studio (Gemma 4)":
                         uploaded_api_files = []
                         output_text = ""
                         try:
+                            # Convert flat text-less scanned layout layers into pure visual PNG files
                             if is_scanned_pdf:
                                 uploaded_file.seek(0)
                                 images = convert_from_bytes(uploaded_file.read(), first_page=1, last_page=3)
@@ -325,7 +403,8 @@ with tab2:
                                     f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached visual page scans completely.",
                                 ] + uploaded_api_files
                             
-                            elif len(file_raw_context) > 100000:
+                            # Push large media enclosures (Audio/Video/Large Docs) via Google File API layer natively
+                            elif file_type in ["mp3", "wav", "mp4", "mov"] or len(file_raw_context) > 100000:
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
                                     temp_file.write(uploaded_file.getvalue())
                                     temp_path = temp_file.name
@@ -335,7 +414,7 @@ with tab2:
                                 os.unlink(temp_path)
                                 
                                 composite_payload = [
-                                    f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached compliance object completely.",
+                                    f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached verification asset file completely.",
                                     uploaded_api_file
                                 ]
                             else:
@@ -358,25 +437,30 @@ with tab2:
                             raise google_err
                         
                         # Stop calculation timer & save state
+                        # Stop calculation timer & save state
                         stop_timer = time.time()
-                        st.session_state.last_latency = stop_timer - start_timer
+                        duration = stop_timer - start_timer
+                        estimated_tokens = int(len(output_text.split()) * 1.33) if output_text else 1
+                        
+                        st.session_state.actual_latency = duration
+                        st.session_state.actual_token_count = estimated_tokens
+                        st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
                         
                         if output_text:
                             st.write("### 📋 Executive Financial Audit Report")
                             st.markdown(output_text)
-                            st.rerun() # Refresh layout to display dynamic timing values
+                            st.rerun()
                         else:
                             st.error("❌ Empty payload structural response returned from Gemma cluster.")
                             
                     else:
-                        if is_scanned_pdf:
-                            raw_txt = f"[Scanned Non-Text Layout Structural Asset Context: {file_name}]"
-                        elif file_type in ["csv", "xlsx"]:
+                        # Extract basic text fallback boundaries for the Groq framework processing
+                        if file_type in ["csv", "xlsx"]:
                             raw_txt = file_raw_context
                         elif file_type in ["txt"]:
                             raw_txt = uploaded_file.getvalue().decode("utf-8")
                         else:
-                            raw_txt = f"[Scanned Binary File Metadata: {file_name}]"
+                            raw_txt = file_raw_context if file_raw_context else f"[Binary File Metadata: {file_name}]"
                             
                         truncated_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{raw_txt[:30000]}\n\nOutput concise markdown summary under 350 tokens."
                         response = groq_client.chat.completions.create(
@@ -385,15 +469,20 @@ with tab2:
                             temperature=0.1,
                             max_tokens=500
                         )
-                        output_text = response.choices.message.content
+                        output_text = response.choices[0].message.content
                         
                         # Stop calculation timer & save state
                         stop_timer = time.time()
-                        st.session_state.last_latency = stop_timer - start_timer
+                        duration = stop_timer - start_timer
+                        estimated_tokens = int(len(output_text.split()) * 1.33) if output_text else 1
+                        
+                        st.session_state.actual_latency = duration
+                        st.session_state.actual_token_count = estimated_tokens
+                        st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
                         
                         st.write("### 📋 Executive Financial Audit Report")
                         st.markdown(output_text)
-                        st.rerun() # Refresh layout to display dynamic timing values
+                        st.rerun()
                         
                 except Exception as e:
                     st.error(f"Failed to scan document: {str(e)}")
