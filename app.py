@@ -175,6 +175,7 @@ with tab1:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    # Direct extraction loop to display previous conversation data cleanly
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -213,7 +214,7 @@ with tab1:
                                 placeholder.markdown(full_response + "▌")
                     except Exception as chat_err:
                         if "500" in str(chat_err) and model_option != "gemma-4-26b-a4b-it":
-                            st.warning("🔄 System workload spike. Routing to Gemma 4 MoE fallback cluster...")
+                            st.warning("🔄 System encountered a server workload spike. Routing to Gemma 4 MoE fallback cluster...")
                             response_stream = google_client.models.generate_content_stream(
                                 model="gemma-4-26b-a4b-it",
                                 contents=chat_contents,
@@ -239,8 +240,8 @@ with tab1:
                         stream=True
                     )
                     for chunk in completion:
-                        if chunk.choices and hasattr(chunk.choices, 'delta'):
-                            chunk_text = getattr(chunk.choices.delta, 'content', '') or ''
+                        if chunk.choices and hasattr(chunk.choices[0], 'delta'):
+                            chunk_text = getattr(chunk.choices[0].delta, 'content', '') or ''
                             if chunk_text:
                                 full_response += chunk_text
                                 generated_chunks += 1
@@ -254,192 +255,20 @@ with tab1:
                 if estimated_tokens == 0:
                     estimated_tokens = generated_chunks
                 
+                # Save data directly into session storage elements
                 st.session_state.actual_latency = duration
                 st.session_state.actual_token_count = estimated_tokens
                 st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
                 
+                # Clear text box and append raw response parameters securely before layout render pass
                 placeholder.markdown(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
+                
+                # HARDENED FIX: Force page refresh through a state modification to lock text vectors safely
                 st.rerun()
                 
             except Exception as e:
                 st.error(f"Execution Error: {str(e)}")
-# --- TAB 2: MULTI-FORMAT AUDITOR ENGINE ---
-with tab2:
-    st.subheader("📁 Comprehensive Enclosure & Document Risk Scanner")
-    uploaded_file = st.file_uploader(
-        "Choose an enclosure file to audit...", 
-        type=["csv", "xlsx", "pdf", "txt", "docx", "pptx", "png", "jpg", "jpeg", "mp3", "wav", "mp4", "mov"]
-    )
-    
-    detected_type = "default"
-    if uploaded_file is not None:
-        file_name = uploaded_file.name
-        file_type = file_name.split(".")[-1].lower()
-        if file_type in ["csv", "xlsx"]: detected_type = "spreadsheet"
-        elif file_type in ["txt", "pdf", "docx", "pptx"]: detected_type = "document"
-        elif file_type in ["png", "jpg", "jpeg"]: detected_type = "image"
-        elif file_type in ["mp4", "mov"]: detected_type = "video"
-        elif file_type in ["mp3", "wav"]: detected_type = "audio"
-
-    if not override_mode and detected_type != st.session_state.current_file_type:
-        st.session_state.current_file_type = detected_type
-        st.rerun()
-
-    file_raw_context = ""
-    is_scanned_pdf = False
-    
-    if uploaded_file is not None:
-        file_name = uploaded_file.name
-        file_type = file_name.split(".")[-1].lower()
-        
-        if file_type in ["csv", "xlsx"]:
-            st.info(f"📊 Spreadsheet Log Ingested: {file_name}")
-            df = pd.read_csv(uploaded_file) if file_type == "csv" else pd.read_excel(uploaded_file)
-            st.dataframe(df.head(), use_container_width=True)
-            file_raw_context = df.to_string()
-        elif file_type in ["txt", "pdf", "docx", "pptx"]:
-            st.info(f"📄 Corporate Agreement/Asset Ingested: {file_name}")
-            if file_type == "pdf":
-                try:
-                    pdf_reader = PdfReader(uploaded_file)
-                    parsed_pages = []
-                    for page in pdf_reader.pages:
-                        text_extract = page.extract_text()
-                        if text_extract: parsed_pages.append(text_extract)
-                    file_raw_context = "\n".join(parsed_pages).strip()
-                except:
-                    file_raw_context = ""
-                if not file_raw_context:
-                    is_scanned_pdf = True
-                    st.warning("⚠️ Scanned Image-PDF layout detected. Engaging visual multi-modal layer...")
-                    file_raw_context = "[Scanned Multimodal Image Buffer Layer]"
-            elif file_type == "docx" and DocxReader:
-                try:
-                    doc = DocxReader(uploaded_file)
-                    file_raw_context = "\n".join([p.text for p in doc.paragraphs]).strip()
-                except: pass
-            elif file_type == "pptx" and PptxReader:
-                try:
-                    prs = PptxReader(uploaded_file)
-                    slide_txt = []
-                    for slide in prs.slides:
-                        for shape in slide.shapes:
-                            if hasattr(shape, "text"): slide_txt.append(shape.text)
-                    file_raw_context = "\n".join(slide_txt).strip()
-                except: pass
-            else:
-                file_raw_context = uploaded_file.getvalue().decode("utf-8")
-                
-            if file_raw_context and not is_scanned_pdf:
-                st.text_area("Document Content Extract Preview", value=file_raw_context[:1000], height=120, disabled=True)
-        elif file_type in ["png", "jpg", "jpeg"]:
-            st.image(uploaded_file, width=300)
-            file_raw_context = "[Image Active]"
-        elif file_type in ["mp3", "wav"]:
-            st.audio(uploaded_file)
-            file_raw_context = f"[Audio Asset: {file_name}]"
-        elif file_type in ["mp4", "mov"]:
-            st.video(uploaded_file)
-            file_raw_context = f"[Video Asset: {file_name}]"
-
-        # ==========================================
-        # HYBRID ENGINE COMPOSITE SCAN PLAN
-        # ==========================================
-        st.write("### 📊 Live Performance Benchmark Evaluation Suite")
-        
-        # Create an independent, persistent empty layout block for the report display
-        report_display_anchor = st.empty()
-        
-        if file_raw_context and st.button("🚀 Execute Hybrid Platform Risk Scan"):
-            if (provider == "Google AI Studio (Gemma 4)" and not google_client) or (provider == "Groq Cloud (Open-Weights)" and not groq_client):
-                st.error("❌ Key infrastructure parameters missing.")
-                st.stop()
-                
-            with st.spinner("Executing calculations via chosen engine router..."):
-                try:
-                    system_baseline = "You are an expert financial risk engine auditor. Respond cleanly and objectively using structured markdown."
-                    start_timer = time.time()
-                    
-                    if provider == "Google AI Studio (Gemma 4)":
-                        uploaded_api_files = []
-                        output_text = ""
-                        try:
-                            if is_scanned_pdf:
-                                uploaded_file.seek(0)
-                                images = convert_from_bytes(uploaded_file.read(), first_page=1, last_page=3)
-                                for idx, img in enumerate(images):
-                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_img:
-                                        img.save(temp_img.name, format="PNG")
-                                        temp_img_path = temp_img.name
-                                    uploaded_api_file = google_client.files.upload(file=temp_img_path)
-                                    uploaded_api_files.append(uploaded_api_file)
-                                    os.unlink(temp_img_path)
-                                composite_payload = [f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit visual page scans.", ] + uploaded_api_files
-                            elif file_type in ["mp3", "wav", "mp4", "mov"] or len(file_raw_context) > 100000:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
-                                    temp_file.write(uploaded_file.getvalue())
-                                    temp_path = temp_file.name
-                                uploaded_api_file = google_client.files.upload(file=temp_path)
-                                uploaded_api_files.append(uploaded_api_file)
-                                os.unlink(temp_path)
-                                composite_payload = [f"Master Blueprint:\n{user_configured_prompt}\n\nAudit attached asset.", uploaded_api_file]
-                            else:
-                                composite_payload = [f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nConcise markdown under 350 tokens."]
-                            
-                            response = google_client.models.generate_content(
-                                model=model_option, contents=composite_payload,
-                                config={"system_instruction": system_baseline, "temperature": 0.1, "max_output_tokens": 500}
-                            )
-                            output_text = response.text
-                            for f_obj in uploaded_api_files:
-                                google_client.files.delete(name=f_obj.name)
-                        except Exception as google_err:
-                            for f_obj in uploaded_api_files:
-                                try: google_client.files.delete(name=f_obj.name)
-                                except: pass
-                            raise google_err
-                        
-                        stop_timer = time.time()
-                        duration = stop_timer - start_timer
-                        estimated_tokens = int(len(output_text.split()) * 1.33) if output_text else 1
-                        
-                        st.session_state.actual_latency = duration
-                        st.session_state.actual_token_count = estimated_tokens
-                        st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
-                        
-                        if output_text:
-                            st.session_state.last_audit_report = output_text
-                            st.rerun()
-                        else:
-                            st.error("❌ Empty payload returned from Gemma cluster.")
-                            
-                    else:
-                        if is_scanned_pdf: raw_txt = f"[Scanned Non-Text Layout Context: {file_name}]"
-                        elif file_type in ["csv", "xlsx"]: raw_txt = file_raw_context
-                        elif file_type in ["txt"]: raw_txt = uploaded_file.getvalue().decode("utf-8")
-                        else: raw_txt = file_raw_context if file_raw_context else f"[Binary File Metadata: {file_name}]"
-                            
-                        truncated_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{raw_txt[:30000]}\n\nOutput concise markdown summary under 350 tokens."
-                        response = groq_client.chat.completions.create(
-                            model=model_option, messages=[{"role": "system", "content": system_baseline}, {"role": "user", "content": truncated_prompt}],
-                            temperature=0.1, max_tokens=500
-                        )
-                        output_text = response.choices.message.content
-                        
-                        stop_timer = time.time()
-                        duration = stop_timer - start_timer
-                        estimated_tokens = int(len(output_text.split()) * 1.33) if output_text else 1
-                        
-                        st.session_state.actual_latency = duration
-                        st.session_state.actual_token_count = estimated_tokens
-                        st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
-                        
-                        st.session_state.last_audit_report = output_text
-                        st.rerun()
-                        
-                except Exception as e:
-                    st.error(f"Failed to scan document: {str(e)}")
 
         # FIXED PERSISTENT RENDERING LAYER: Draws text directly onto the secure anchor layout framework
         if st.session_state.last_audit_report:
