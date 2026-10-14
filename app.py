@@ -202,6 +202,7 @@ with tab1:
                 if provider == "Google AI Studio (Gemma 4)":
                     chat_contents = [m["content"] for m in st.session_state.messages]
                     try:
+                        # Try standard streaming path first
                         response_stream = google_client.models.generate_content_stream(
                             model=model_option,
                             contents=chat_contents,
@@ -213,20 +214,21 @@ with tab1:
                                 generated_chunks += 1
                                 placeholder.markdown(full_response + "▌")
                     except Exception as chat_err:
-                        if "500" in str(chat_err) and model_option != "gemma-4-26b-a4b-it":
-                            st.warning("🔄 System encountered a server workload spike. Routing to Gemma 4 MoE fallback cluster...")
-                            response_stream = google_client.models.generate_content_stream(
-                                model="gemma-4-26b-a4b-it",
+                        # HARDENED FIX: If streaming hits a 500 error, drop streaming and run stable batch content delivery
+                        st.warning("🔄 Server congestion handled. Re-routing through stabilized B2B transaction layer...")
+                        try:
+                            stable_response = google_client.models.generate_content(
+                                model="gemma-4-26b-a4b-it", # Fallback to high-velocity MoE
                                 contents=chat_contents,
-                                config={"system_instruction": user_configured_prompt, "temperature": temperature}
+                                config={"system_instruction": user_configured_prompt, "temperature": temperature, "max_output_tokens": 500}
                             )
-                            for chunk in response_stream:
-                                if chunk.text:
-                                    full_response += chunk.text
-                                    generated_chunks += 1
-                                    placeholder.markdown(full_response + "▌")
-                        else:
-                            raise chat_err
+                            if stable_response.text:
+                                full_response = stable_response.text
+                                placeholder.markdown(full_response)
+                            else:
+                                raise chat_err
+                        except Exception as stable_err:
+                            raise stable_err
                             
                 # ROUTE 2: GROQ TRADITIONAL TOKEN PROCESSING LOOP
                 else:
@@ -240,8 +242,8 @@ with tab1:
                         stream=True
                     )
                     for chunk in completion:
-                        if chunk.choices and hasattr(chunk.choices[0], 'delta'):
-                            chunk_text = getattr(chunk.choices[0].delta, 'content', '') or ''
+                        if chunk.choices and hasattr(chunk.choices[0].delta, 'content'):
+                            chunk_text = chunk.choices[0].delta.content or ''
                             if chunk_text:
                                 full_response += chunk_text
                                 generated_chunks += 1
@@ -264,7 +266,7 @@ with tab1:
                 placeholder.markdown(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 
-                # HARDENED FIX: Force page refresh through a state modification to lock text vectors safely
+                # Force window reload to lock data onto telemetry metrics grid bars
                 st.rerun()
                 
             except Exception as e:
