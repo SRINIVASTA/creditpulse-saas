@@ -57,6 +57,8 @@ if "actual_tokens_per_sec" not in st.session_state:
     st.session_state.actual_tokens_per_sec = 0.0
 if "actual_token_count" not in st.session_state:
     st.session_state.actual_token_count = 0
+if "last_audit_report" not in st.session_state:
+    st.session_state.last_audit_report = ""
 
 persona_blueprints = {
     "default": "You are an expert financial risk analyst. Provide highly structured, conservative, and bulleted risk audit observations.",
@@ -134,21 +136,22 @@ with st.sidebar:
         st.session_state.actual_latency = 0.0
         st.session_state.actual_tokens_per_sec = 0.0
         st.session_state.actual_token_count = 0
+        st.session_state.last_audit_report = ""
         if "user_frozen_prompt" in st.session_state:
             del st.session_state.user_frozen_prompt
         st.cache_data.clear()
         st.cache_resource.clear()
         st.rerun()
-
 # ==========================================
 # 5. DYNAMIC B2B VISUAL METRICS TELEMETRY BAR
 # ==========================================
+# Isolated within a standard container layout block to render state parameters on the fly
 metrics_container = st.container()
 with metrics_container:
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         if st.session_state.actual_latency > 0.0:
-            st.metric(label="Live Inference Latency", value=f"{st.session_state.actual_latency:.3f}s", delta="Stopwatch Calculation")
+            st.metric(label="Live Inference Latency", value=f"{st.session_state.actual_latency:.3f}s", delta="Actual Stopwatch Timing")
         else:
             st.metric(label="Live Inference Latency", value="Waiting...", delta="Awaiting First Run")
     with col2:
@@ -159,7 +162,7 @@ with metrics_container:
     with col3:
         st.metric(label="Compliance Matrix", value="100% Isolated", delta="DPDP Act 2026 Ready")
     with col4:
-        st.metric(label="Active Target Architecture", value=model_option.split("/")[-1], delta=f"Engine infrastructure: {provider.split()[0]}")
+        st.metric(label="Active Target Weights", value=model_option.split("/")[-1], delta=f"Engine: {provider.split()[0]}")
 
 st.markdown("---")
 # ==========================================
@@ -247,7 +250,6 @@ with tab1:
                 stop_timer = time.time()
                 duration = stop_timer - start_timer
                 
-                # Approximate generated tokens based on text word-to-token ratio metrics (1 word ~ 1.3 tokens)
                 estimated_tokens = int(len(full_response.split()) * 1.33) if full_response else 0
                 if estimated_tokens == 0:
                     estimated_tokens = generated_chunks
@@ -258,8 +260,6 @@ with tab1:
                 
                 placeholder.markdown(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
-                
-                # Force an immediate independent page refresh to show updated benchmark metrics on screen
                 st.rerun()
                 
             except Exception as e:
@@ -267,8 +267,6 @@ with tab1:
 # --- TAB 2: MULTI-FORMAT AUDITOR ENGINE ---
 with tab2:
     st.subheader("📁 Comprehensive Enclosure & Document Risk Scanner")
-    st.write("Upload any operational corporate file asset class to perform an automated AI compliance and liability scan.")
-    
     uploaded_file = st.file_uploader(
         "Choose an enclosure file to audit...", 
         type=["csv", "xlsx", "pdf", "txt", "docx", "pptx", "png", "jpg", "jpeg", "mp3", "wav", "mp4", "mov"]
@@ -295,17 +293,13 @@ with tab2:
         file_name = uploaded_file.name
         file_type = file_name.split(".")[-1].lower()
         
-        # --- ENCLOSURE TYPE 1: SPREADSHEETS (CSV, XLSX) ---
         if file_type in ["csv", "xlsx"]:
             st.info(f"📊 Spreadsheet Log Ingested: {file_name}")
             df = pd.read_csv(uploaded_file) if file_type == "csv" else pd.read_excel(uploaded_file)
             st.dataframe(df.head(), use_container_width=True)
             file_raw_context = df.to_string()
-            
-        # --- ENCLOSURE TYPE 2: DOCUMENTS (PDF, TXT, WORD, PPTX) ---
         elif file_type in ["txt", "pdf", "docx", "pptx"]:
             st.info(f"📄 Corporate Agreement/Asset Ingested: {file_name}")
-            
             if file_type == "pdf":
                 try:
                     pdf_reader = PdfReader(uploaded_file)
@@ -318,52 +312,36 @@ with tab2:
                     file_raw_context = ""
                 if not file_raw_context:
                     is_scanned_pdf = True
-                    st.warning("⚠️ Flat Scanned Image-PDF layout detected. Engaging visual multi-modal extraction layer...")
+                    st.warning("⚠️ Scanned Image-PDF layout detected. Engaging visual multi-modal layer...")
                     file_raw_context = "[Scanned Multimodal Image Buffer Layer]"
-            
-            elif file_type == "docx":
-                if DocxReader:
-                    try:
-                        doc = DocxReader(uploaded_file)
-                        file_raw_context = "\n".join([p.text for p in doc.paragraphs]).strip()
-                    except Exception as e:
-                        file_raw_context = f"[Word Enclosure Vector Extract Error: {str(e)}]"
-                else:
-                    file_raw_context = f"[Word Document Contract Content Context: {file_name}]"
-                    st.warning("⚙️ python-docx missing in framework. Activating structured text context fallback.")
-                    
-            elif file_type == "pptx":
-                if PptxReader:
-                    try:
-                        prs = PptxReader(uploaded_file)
-                        slide_txt = []
-                        for slide in prs.slides:
-                            for shape in slide.shapes:
-                                if hasattr(shape, "text"): slide_txt.append(shape.text)
-                        file_raw_context = "\n".join(slide_txt).strip()
-                    except Exception as e:
-                        file_raw_context = f"[Presentation Enclosure Vector Extract Error: {str(e)}]"
-                else:
-                    file_raw_context = f"[Corporate PPT Presentation Deck Context: {file_name}]"
-                    st.warning("⚙️ python-pptx missing in framework. Activating presentation context fallback.")
+            elif file_type == "docx" and DocxReader:
+                try:
+                    doc = DocxReader(uploaded_file)
+                    file_raw_context = "\n".join([p.text for p in doc.paragraphs]).strip()
+                except: pass
+            elif file_type == "pptx" and PptxReader:
+                try:
+                    prs = PptxReader(uploaded_file)
+                    slide_txt = []
+                    for slide in prs.slides:
+                        for shape in slide.shapes:
+                            if hasattr(shape, "text"): slide_txt.append(shape.text)
+                    file_raw_context = "\n".join(slide_txt).strip()
+                except: pass
             else:
                 file_raw_context = uploaded_file.getvalue().decode("utf-8")
                 
             if file_raw_context and not is_scanned_pdf:
                 st.text_area("Document Content Extract Preview", value=file_raw_context[:1000], height=120, disabled=True)
-
-        # --- ENCLOSURE TYPE 3: IMAGES (PNG, JPG, JPEG) ---
         elif file_type in ["png", "jpg", "jpeg"]:
             st.image(uploaded_file, width=300)
-            file_raw_context = "[Image Identity Compliance Scan Binary Frame Active]"
-
-        # --- ENCLOSURE TYPE 4: MEDIA STREAMS (AUDIO & VIDEO ENCLOSURES) ---
+            file_raw_context = "[Image Active]"
         elif file_type in ["mp3", "wav"]:
             st.audio(uploaded_file)
-            file_raw_context = f"[Verification Voice Authentication Audio Interaction Script Log Object: {file_name}]"
+            file_raw_context = f"[Audio Asset: {file_name}]"
         elif file_type in ["mp4", "mov"]:
             st.video(uploaded_file)
-            file_raw_context = f"[User Interactive Screen Audit Activity Trail Walkthrough Video Tracking Object: {file_name}]"
+            file_raw_context = f"[Video Asset: {file_name}]"
 
         # ==========================================
         # HYBRID ENGINE COMPOSITE SCAN PLAN
@@ -377,67 +355,47 @@ with tab2:
             with st.spinner("Executing calculations via chosen engine router..."):
                 try:
                     system_baseline = "You are an expert financial risk engine auditor. Respond cleanly and objectively using structured markdown."
-                    
-                    # Start Actual Telemetry Stopwatch
                     start_timer = time.time()
                     
                     if provider == "Google AI Studio (Gemma 4)":
                         uploaded_api_files = []
                         output_text = ""
                         try:
-                            # Convert flat text-less scanned layout layers into pure visual PNG files
                             if is_scanned_pdf:
                                 uploaded_file.seek(0)
                                 images = convert_from_bytes(uploaded_file.read(), first_page=1, last_page=3)
-                                
                                 for idx, img in enumerate(images):
                                     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_img:
                                         img.save(temp_img.name, format="PNG")
                                         temp_img_path = temp_img.name
-                                    
                                     uploaded_api_file = google_client.files.upload(file=temp_img_path)
                                     uploaded_api_files.append(uploaded_api_file)
                                     os.unlink(temp_img_path)
-                                
-                                composite_payload = [
-                                    f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached visual page scans completely.",
-                                ] + uploaded_api_files
-                            
-                            # Push large media enclosures (Audio/Video/Large Docs) via Google File API layer natively
+                                composite_payload = [f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit visual page scans.", ] + uploaded_api_files
                             elif file_type in ["mp3", "wav", "mp4", "mov"] or len(file_raw_context) > 100000:
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
                                     temp_file.write(uploaded_file.getvalue())
                                     temp_path = temp_file.name
-                                
                                 uploaded_api_file = google_client.files.upload(file=temp_path)
                                 uploaded_api_files.append(uploaded_api_file)
                                 os.unlink(temp_path)
-                                
-                                composite_payload = [
-                                    f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached verification asset file completely.",
-                                    uploaded_api_file
-                                ]
+                                composite_payload = [f"Master Blueprint:\n{user_configured_prompt}\n\nAudit attached asset.", uploaded_api_file]
                             else:
-                                composite_payload = [f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nOutput concise markdown summary under 350 tokens."]
+                                composite_payload = [f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nConcise markdown under 350 tokens."]
                             
                             response = google_client.models.generate_content(
-                                model=model_option,
-                                contents=composite_payload,
+                                model=model_option, contents=composite_payload,
                                 config={"system_instruction": system_baseline, "temperature": 0.1, "max_output_tokens": 500}
                             )
                             output_text = response.text
-                            
                             for f_obj in uploaded_api_files:
                                 google_client.files.delete(name=f_obj.name)
-                                
                         except Exception as google_err:
                             for f_obj in uploaded_api_files:
                                 try: google_client.files.delete(name=f_obj.name)
                                 except: pass
                             raise google_err
                         
-                        # Stop calculation timer & save state
-                        # Stop calculation timer & save state
                         stop_timer = time.time()
                         duration = stop_timer - start_timer
                         estimated_tokens = int(len(output_text.split()) * 1.33) if output_text else 1
@@ -447,31 +405,24 @@ with tab2:
                         st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
                         
                         if output_text:
-                            st.write("### 📋 Executive Financial Audit Report")
-                            st.markdown(output_text)
+                            st.session_state.last_audit_report = output_text
                             st.rerun()
                         else:
-                            st.error("❌ Empty payload structural response returned from Gemma cluster.")
+                            st.error("❌ Empty payload returned from Gemma cluster.")
                             
                     else:
-                        # Extract basic text fallback boundaries for the Groq framework processing
-                        if file_type in ["csv", "xlsx"]:
-                            raw_txt = file_raw_context
-                        elif file_type in ["txt"]:
-                            raw_txt = uploaded_file.getvalue().decode("utf-8")
-                        else:
-                            raw_txt = file_raw_context if file_raw_context else f"[Binary File Metadata: {file_name}]"
+                        if is_scanned_pdf: raw_txt = f"[Scanned Non-Text Layout Context: {file_name}]"
+                        elif file_type in ["csv", "xlsx"]: raw_txt = file_raw_context
+                        elif file_type in ["txt"]: raw_txt = uploaded_file.getvalue().decode("utf-8")
+                        else: raw_txt = file_raw_context if file_raw_context else f"[Binary File Metadata: {file_name}]"
                             
                         truncated_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{raw_txt[:30000]}\n\nOutput concise markdown summary under 350 tokens."
                         response = groq_client.chat.completions.create(
-                            model=model_option,
-                            messages=[{"role": "system", "content": system_baseline}, {"role": "user", "content": truncated_prompt}],
-                            temperature=0.1,
-                            max_tokens=500
+                            model=model_option, messages=[{"role": "system", "content": system_baseline}, {"role": "user", "content": truncated_prompt}],
+                            temperature=0.1, max_tokens=500
                         )
-                        output_text = response.choices[0].message.content
+                        output_text = response.choices.message.content
                         
-                        # Stop calculation timer & save state
                         stop_timer = time.time()
                         duration = stop_timer - start_timer
                         estimated_tokens = int(len(output_text.split()) * 1.33) if output_text else 1
@@ -480,9 +431,14 @@ with tab2:
                         st.session_state.actual_token_count = estimated_tokens
                         st.session_state.actual_tokens_per_sec = (estimated_tokens / duration) if duration > 0 else 0.0
                         
-                        st.write("### 📋 Executive Financial Audit Report")
-                        st.markdown(output_text)
+                        st.session_state.last_audit_report = output_text
                         st.rerun()
                         
                 except Exception as e:
                     st.error(f"Failed to scan document: {str(e)}")
+
+    # RENDER ENGINE: Ensures the saved report persists securely on screen post-refresh
+    if st.session_state.last_audit_report:
+        st.write("---")
+        st.write("### 📋 Executive Financial Audit Report")
+        st.markdown(st.session_state.last_audit_report)
