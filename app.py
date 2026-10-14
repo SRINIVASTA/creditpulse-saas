@@ -250,12 +250,21 @@ with tab2:
                     composite_user_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nOutput concise markdown summary under 350 tokens."
                     
                     if provider == "Google AI Studio (Gemma 4)":
+                        # Standardised array inputs fix output truncation
                         response = google_client.models.generate_content(
                             model=model_option,
-                            contents=composite_user_prompt,
-                            config={"system_instruction": system_baseline, "temperature": 0.1, "max_output_tokens": 500}
+                            contents=[composite_user_prompt],
+                            config={
+                                "system_instruction": system_baseline, 
+                                "temperature": 0.1, 
+                                "max_output_tokens": 500
+                            }
                         )
-                        output_text = response.text
+                        
+                        if response.text:
+                            output_text = response.text
+                        else:
+                            output_text = "❌ Empty or unparseable output returned from the Gemma 4 server endpoint."
                     else:
                         response = groq_client.chat.completions.create(
                             model=model_option,
