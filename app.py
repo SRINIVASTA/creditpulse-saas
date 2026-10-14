@@ -243,10 +243,10 @@ with tab2:
         elif file_type in ["mp4", "mov"]:
             st.video(uploaded_file)
 
-# ==========================================
-# HYBRID ENGINE COMPOSITE SCAN PLAN
-# ==========================================
-        if st.button("🚀 Execute Hybrid Platform Risk Scan"):
+        # ==========================================
+        # HYBRID ENGINE COMPOSITE SCAN PLAN
+        # ==========================================
+        if file_raw_context and st.button("🚀 Execute Hybrid Platform Risk Scan"):
             if (provider == "Google AI Studio (Gemma 4)" and not google_client) or (provider == "Groq Cloud (Open-Weights)" and not groq_client):
                 st.error("❌ Key infrastructure parameters missing.")
                 st.stop()
@@ -259,19 +259,22 @@ with tab2:
                         uploaded_api_file = None
                         output_text = ""
                         try:
-                            # Unified Sandbox Fix: Save the raw bytes directly to a temporary file
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
-                                temp_file.write(uploaded_file.getvalue())
-                                temp_path = temp_file.name
-                            
-                            # Stream the raw file layer straight to Google's backend file architecture
-                            uploaded_api_file = google_client.files.upload(file=temp_path)
-                            os.unlink(temp_path)
-                            
-                            composite_payload = [
-                                f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached compliance object completely.",
-                                uploaded_api_file
-                            ]
+                            # For large text contexts, upload via the official File API layer
+                            if len(file_raw_context) > 100000:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
+                                    temp_file.write(uploaded_file.getvalue())
+                                    temp_path = temp_file.name
+                                
+                                # Index the asset directly into Google's infrastructure
+                                uploaded_api_file = google_client.files.upload(file=temp_path)
+                                os.unlink(temp_path)
+                                
+                                composite_payload = [
+                                    f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached compliance object completely.",
+                                    uploaded_api_file
+                                ]
+                            else:
+                                composite_payload = [f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nOutput concise markdown summary under 350 tokens."]
                             
                             response = google_client.models.generate_content(
                                 model=model_option,
@@ -280,6 +283,7 @@ with tab2:
                             )
                             output_text = response.text
                             
+                            # Clean up the cloud file reference once parsing executes
                             if uploaded_api_file:
                                 google_client.files.delete(name=uploaded_api_file.name)
                                 
@@ -296,23 +300,16 @@ with tab2:
                             st.error("❌ Empty payload structural response returned from Gemma cluster.")
                             
                     else:
-                        # Extract basic text fallback boundaries for the Groq framework processing
-                        if file_type in ["csv", "xlsx"]:
-                            df = pd.read_csv(uploaded_file) if file_type == "csv" else pd.read_excel(uploaded_file)
-                            raw_txt = df.to_string()
-                        elif file_type in ["txt"]:
-                            raw_txt = uploaded_file.getvalue().decode("utf-8")
-                        else:
-                            raw_txt = f"[Scanned Binary File Metadata: {file_name}]"
-                            
-                        truncated_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{raw_txt[:30000]}\n\nOutput concise markdown summary under 350 tokens."
+                        # Traditional plain text slicing mechanics for Groq LPU processing
+                        truncated_prompt = f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context[:30000]}\n\nOutput concise markdown summary under 350 tokens."
                         response = groq_client.chat.completions.create(
                             model=model_option,
                             messages=[{"role": "system", "content": system_baseline}, {"role": "user", "content": truncated_prompt}],
                             temperature=0.1,
                             max_tokens=500
                         )
-                        output_text = response.choices.message.content
+                        # FIXED: Added explicit [0] index accessor to capture list array choices cleanly
+                        output_text = response.choices[0].message.content
                         st.write("### 📋 Executive Financial Audit Report")
                         st.markdown(output_text)
                         
