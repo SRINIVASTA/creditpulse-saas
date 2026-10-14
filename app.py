@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from groq import Groq
 from google import genai
+from pypdf import PdfReader
+from pdf2image import convert_from_bytes  # Converts scanned vector blocks to image frames
 import tempfile
 import os
 
@@ -156,7 +158,6 @@ with tab1:
             full_response = ""
             
             try:
-                # ROUTE 1: GOOGLE GEMMA 4 RUNTIME INFERENCE MATRIX
                 if provider == "Google AI Studio (Gemma 4)":
                     chat_contents = [m["content"] for m in st.session_state.messages]
                     try:
@@ -184,7 +185,6 @@ with tab1:
                         else:
                             raise chat_err
                             
-                # ROUTE 2: GROQ TRADITIONAL TOKEN PROCESSING LOOP
                 else:
                     api_messages = [{"role": "system", "content": user_configured_prompt}] + [
                         {"role": m["role"], "content": m["content"]} for m in st.session_state.messages
@@ -229,14 +229,13 @@ with tab2:
         st.session_state.current_file_type = detected_type
         st.rerun()
 
-    # CRITICAL SECURITY INITIALIZATION: Prevents all backend runtime NameErrors
     file_raw_context = ""
+    is_scanned_pdf = False
     
     if uploaded_file is not None:
         file_name = uploaded_file.name
         file_type = file_name.split(".")[-1].lower()
         
-        # Display file interface details to users natively and assign context safety flags
         if file_type in ["csv", "xlsx"]:
             st.info(f"📊 Spreadsheet Registered: {file_name}")
             df = pd.read_csv(uploaded_file) if file_type == "csv" else pd.read_excel(uploaded_file)
@@ -244,7 +243,26 @@ with tab2:
             file_raw_context = df.to_string()
         elif file_type in ["txt", "pdf"]:
             st.info(f"📄 Agreement Document Registered: {file_name}")
-            file_raw_context = "[Document Binary Buffer Active]"
+            if file_type == "pdf":
+                try:
+                    pdf_reader = PdfReader(uploaded_file)
+                    parsed_pages = []
+                    for page in pdf_reader.pages:
+                        text_extract = page.extract_text()
+                        if text_extract: parsed_pages.append(text_extract)
+                    file_raw_context = "\n".join(parsed_pages).strip()
+                except:
+                    file_raw_context = ""
+                
+                # Check for image-based scanned layouts
+                if not file_raw_context:
+                    is_scanned_pdf = True
+                    st.warning("⚠️ Scanned Image-PDF layout detected. Engaging multi-modal vision router framework...")
+                    file_raw_context = "[Scanned Multimodal Image Buffer Active]"
+                else:
+                    st.text_area("Document Text Extract Preview", value=file_raw_context[:1000], height=150, disabled=True)
+            else:
+                file_raw_context = uploaded_file.getvalue().decode("utf-8")
         elif file_type in ["png", "jpg", "jpeg"]:
             st.image(uploaded_file, width=400)
             file_raw_context = "[Image Binary Buffer Active]"
@@ -265,22 +283,41 @@ with tab2:
                     system_baseline = "You are an expert financial risk engine auditor. Respond cleanly and objectively using structured markdown."
                     
                     if provider == "Google AI Studio (Gemma 4)":
-                        uploaded_api_file = None
+                        uploaded_api_files = []
                         output_text = ""
                         try:
-                            # Unified Sandbox Fix: Save the raw bytes directly to a temporary file
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
-                                temp_file.write(uploaded_file.getvalue())
-                                temp_path = temp_file.name
+                            # Direct Fix: Convert image-based PDFs into pure image segments for the multimodal API
+                            if is_scanned_pdf:
+                                uploaded_file.seek(0)
+                                images = convert_from_bytes(uploaded_file.read(), first_page=1, last_page=3) # Restrict to first 3 pages to avoid timeouts
+                                
+                                for idx, img in enumerate(images):
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as temp_img:
+                                        img.save(temp_img.name, format="PNG")
+                                        temp_img_path = temp_img.name
+                                    
+                                    uploaded_api_file = google_client.files.upload(file=temp_img_path)
+                                    uploaded_api_files.append(uploaded_api_file)
+                                    os.unlink(temp_img_path)
+                                
+                                composite_payload = [
+                                    f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached visual page scans completely.",
+                                ] + uploaded_api_files
                             
-                            # Stream the raw file layer straight to Google's backend file architecture
-                            uploaded_api_file = google_client.files.upload(file=temp_path)
-                            os.unlink(temp_path)
-                            
-                            composite_payload = [
-                                f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached compliance object completely.",
-                                uploaded_api_file
-                            ]
+                            # Standard pathway handling logic for normal vector logs
+                            elif len(file_raw_context) > 100000:
+                                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_type}") as temp_file:
+                                    temp_file.write(uploaded_file.getvalue())
+                                    temp_path = temp_file.name
+                                
+                                uploaded_api_file = google_client.files.upload(file=temp_path)
+                                uploaded_api_files.append(uploaded_api_file)
+                                os.unlink(temp_path)                                composite_payload = [
+                                    f"Master Operational Rule Framework Blueprint:\n{user_configured_prompt}\n\nPlease audit the attached compliance object completely.",
+                                    uploaded_api_file
+                                ]
+                            else:
+                                composite_payload = [f"Task Parameters:\n{user_configured_prompt}\n\nDataset Content:\n{file_raw_context}\n\nOutput concise markdown summary under 350 tokens."]
                             
                             response = google_client.models.generate_content(
                                 model=model_option,
@@ -289,13 +326,16 @@ with tab2:
                             )
                             output_text = response.text
                             
-                            if uploaded_api_file:
-                                google_client.files.delete(name=uploaded_api_file.name)
+                            # Clean up file structures safely from cloud accounts
+                            for f_obj in uploaded_api_files:
+                                google_client.files.delete(name=f_obj.name)
                                 
                         except Exception as google_err:
-                            if uploaded_api_file:
-                                try: google_client.files.delete(name=uploaded_api_file.name)
-                                except: pass
+                            for f_obj in uploaded_api_files:
+                                try: 
+                                    google_client.files.delete(name=f_obj.name)
+                                except: 
+                                    pass
                             raise google_err
                         
                         if output_text:
@@ -305,8 +345,9 @@ with tab2:
                             st.error("❌ Empty payload structural response returned from Gemma cluster.")
                             
                     else:
-                        # Extract basic text fallback boundaries for the Groq framework processing
-                        if file_type in ["csv", "xlsx"]:
+                        if is_scanned_pdf:
+                            raw_txt = f"[Scanned Non-Text Layout Structural Asset Context: {file_name}]"
+                        elif file_type in ["csv", "xlsx"]:
                             raw_txt = file_raw_context
                         elif file_type in ["txt"]:
                             raw_txt = uploaded_file.getvalue().decode("utf-8")
@@ -320,7 +361,6 @@ with tab2:
                             temperature=0.1,
                             max_tokens=500
                         )
-                        # RESTORED: Explicit [0] index to parse the choice item array cleanly
                         output_text = response.choices[0].message.content
                         st.write("### 📋 Executive Financial Audit Report")
                         st.markdown(output_text)
