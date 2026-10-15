@@ -1,36 +1,31 @@
 graph TD
-    %% Tooltips and Styles
-    classDef roots fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef trunk fill:#bbf,stroke:#333,stroke-width:2px;
-    classDef leaves fill:#bfb,stroke:#333,stroke-width:2px;
-
-    %% --- STAGE 1: THE ROOTS (Design & Machinery) ---
-    subgraph Stage_1 [Stage 1: Foundational Roots]
-        EDA[<b>EDA Companies</b><br>• Synopsys, Cadence<br>• Provides design software]
-        IP[<b>IP & Design Service</b><br>• ARM, Imagination<br>• Provides core blueprints]
-        Equip[<b>Fab Equipment & Materials</b><br>• ASML, Applied Materials<br>• Provides manufacturing machines]
+    %% STAGE 1: FOUNDATIONAL ROOTS
+    subgraph Stage_1_Roots [Stage 1: Foundational Roots]
+        EDA[EDA Software - Synopsys, Cadence]
+        IP[IP Blueprints - ARM, Imagination]
+        Equip[Fab Equipment - ASML, Lam Research]
     end
 
-    %% --- STAGE 2: THE TRUNK (Manufacturing) ---
-    subgraph Stage_2 [Stage 2: Core Processing]
-        Foundry[<b>Foundries / IDMs</b><br>• TSMC, Intel, Samsung<br>• Prints designs onto silicon wafers]
+    %% STAGE 2: MANUFACTURING TRUNK
+    subgraph Stage_2_Trunk [Stage 2: Processing Trunk]
+        Foundry[Foundries and IDMs - TSMC, Intel, Samsung]
     end
 
-    %% --- STAGE 3: THE FINISHING (Packaging & Test) ---
-    subgraph Stage_3 [Stage 3: Assembly & Validation]
-        OSAT[<b>Test & OSAT Companies</b><br>• Amkor, ASE, Teradyne<br>• Cuts, packages, and tests chips]
+    %% STAGE 3: FINISHING STAGE
+    subgraph Stage_3_Finish [Stage 3: Assembly and Validation]
+        OSAT[Test and OSAT Companies - Amkor, ASE]
     end
 
-    %% --- STAGE 4: THE BRANCHES (Final Products) ---
-    subgraph Stage_4 [Stage 4: Specialized Final Chips]
-        Fabless[<b>Fabless Market</b><br>• NVIDIA, Qualcomm, AMD]
-        Analog[<b>Analog & Mixed Signal</b><br>• ADI, onsemi]
-        Memory[<b>Memory Chips</b><br>• SK hynix, Micron]
-        Auto[<b>Automotive Semiconductor</b><br>• Bosch, Renesas]
-        Startups[<b>Emerging Startups</b><br>• InCore, Saankhya]
+    %% STAGE 4: THE BRANCHES
+    subgraph Stage_4_Branches [Stage 4: Specialized Final Chips]
+        Fabless[Fabless Market - NVIDIA, Qualcomm]
+        Analog[Analog and Mixed Signal - ADI, onsemi]
+        Memory[Memory Chips - Micron, SK Hynix]
+        Auto[Automotive Semi - Bosch, Renesas]
+        Startups[Emerging Startups - InCore, Saankhya]
     end
 
-    %% Tree Connections
+    %% Tree Pipeline Connections
     EDA --> Foundry
     IP --> Foundry
     Equip --> Foundry
@@ -42,8 +37,3 @@ graph TD
     OSAT --> Memory
     OSAT --> Auto
     OSAT --> Startups
-
-    %% Apply Styles
-    class EDA,IP,Equip roots;
-    class Foundry,OSAT trunk;
-    class Fabless,Analog,Memory,Auto,Startups leaves;
